@@ -1,0 +1,33 @@
+.{
+    .name = .mission_bitcoin,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.15.2",
+
+    .dependencies = .{
+        .gui_lib = .{
+            .url = "git+https://github.com/PegaFox/gui-lib.git#98fc3e296d3c5f55b5b9a47f6ffad26f90cb53d9",
+            .hash = "gui_lib-3.1.0-AFZkQvtQAQDv2G6HRfj6PHI7dki38GwT-EWndRpO6F9L",
+        },
+        .sdl = .{
+            .url = "git+https://github.com/castholm/SDL.git#f103a1439670c35be756d4491b296a6e3ccffaed",
+            .hash = "sdl-0.3.2+3.2.26-7uIn9BNgfwHaS0qXiSIBLkJf8Jfrh5P6gSWdQvtnvxEp",
+        },
+        .SDL_image = .{
+            .url = "git+https://github.com/allyourcodebase/SDL_image.git#76e7805e9eafe7a0f70f94c530404028e1ebef5a",
+            .hash = "SDL_image-3.2.4--aJoHdEWAAA5k-xEw-utp5jx3Pdu-BffbYDg7kYyXR2e",
+        },
+        .SDL_ttf = .{
+            .url = "git+https://github.com/allyourcodebase/SDL_ttf.git#6b43781327f3929ec6cf29d01a83bcf329752820",
+            .hash = "SDL_ttf-3.2.2-PNW5xN4RAACd6tBC0zAYHC_-MdGnpdilonkq5Dw0RZMz",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "assets",
+        "LICENSE",
+        "README.md",
+    },
+    .fingerprint = 0x47fd4623a74e3fa4, // Changing this has security and trust implications.
+}
