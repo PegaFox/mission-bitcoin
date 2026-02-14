@@ -2,9 +2,6 @@ const std = @import("std");
 const log = std.log;
 const Allocator = std.mem.Allocator;
 
-const sin = std.math.sin;
-const cos = std.math.cos;
-
 const Scene = @import("../scene.zig");
 
 const mainspace = @import("../main.zig");
@@ -21,6 +18,8 @@ const BoardCoord = Player.Pos;
 pub const totalTokens = 21;
 pub const TokenType = std.math.IntFittingRange(0, totalTokens);
 
+var gpa: Allocator = undefined;
+
 var spaceHasTokenTexture: *sdl.SDL_Texture = undefined;
 var spaceRerollTextures: [2]*sdl.SDL_Texture = undefined;
 var spaceTypeTextures =
@@ -28,48 +27,38 @@ var spaceTypeTextures =
 
 var playerTexture: *sdl.SDL_Texture = undefined;
 
-var totalSpaces: usize = 0;
-pub fn getTotalSpaces() usize {return totalSpaces;}
-var board: std.json.Parsed([][]Space) = undefined;
+var spaces = std.ArrayList(Space).empty;
+var board = std.ArrayList([]Space).empty;
 
-var players: [4]Player = @splat(.{
-  .pos = Player.startingPos,
-  .exchangeTokens = 0,
-  .coldStorageTokens = 0,
-  .lostTokens = 0,
-});
+const Color = @Vector(4, f32);
+var players: std.ArrayList(struct {color: Color, value: Player}) = .empty;
 
 pub const scene = Scene{
   .keybinds = &.{},
 
   .init = struct {fn init(allocator: Allocator) !*const Scene
   {
-    spaceHasTokenTexture = sdl.IMG_LoadTexture(
-      mainspace.renderer,
-      try directoryManager.getPath("assets/images/spaces/token_space.svg"));
-    spaceRerollTextures[0] = sdl.IMG_LoadTexture(
-      mainspace.renderer,
-      try directoryManager.getPath("assets/images/spaces/no_reroll.svg"));
-    spaceRerollTextures[1] = sdl.IMG_LoadTexture(
-      mainspace.renderer,
-      try directoryManager.getPath("assets/images/spaces/reroll.svg"));
-    inline for (0..spaceTypeTextures.values.len) |t|
+    gpa = allocator;
+
+    try loadTextures();
+
+    const jsonOut =
+      try jsonFromFile(allocator, [][3]f32, "assets/metadata/players.json");
+    defer jsonOut.deinit();
+
+    try players.ensureTotalCapacity(allocator, jsonOut.value.len);
+    for (jsonOut.value) |player|
     {
-      const spaceType: Space.Type = @enumFromInt(t);
-
-      const filename = spaceType.toSnakeStr();
-      const path =
-        "assets/images/spaces/" ++ filename[0..filename.len-1] ++ ".svg";
-      log.debug("Loading \"{s}\"\n", .{path});
-
-      spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
-        mainspace.renderer,
-        try directoryManager.getPath(path));
+      players.append(allocator, .{
+        .color = player ++ .{1.0},
+        .value = .{
+          .pos = Player.startingPos,
+          .exchangeTokens = 0,
+          .coldStorageTokens = 0,
+          .lostTokens = 0,
+        }
+      }) catch unreachable;
     }
-
-    playerTexture = sdl.IMG_LoadTexture(
-      mainspace.renderer,
-      try directoryManager.getPath("assets/images/player.svg"));
 
     try loadBoard(allocator);
 
@@ -82,10 +71,14 @@ pub const scene = Scene{
     mPos: @Vector(2, f32),
     mButtons: sdl.SDL_MouseButtonFlags) !bool
   {
-    _ = event;
     _ = keys;
     _ = mPos;
     _ = mButtons;
+
+    if (event.type == sdl.SDL_EVENT_KEY_DOWN)
+    {
+      _ = players.items[0].value.move(1);
+    }
 
     return true;
   }}.getInput,
@@ -97,20 +90,26 @@ pub const scene = Scene{
   
   .render = struct {fn render() !void
   {
-    try renderSpaces(board.value);
+    try renderSpaces(board.items);
 
     const winSize = mainspace.winSize();
-    const size = @min(winSize[0], winSize[1]) * 0.025;
+    const size = @min(winSize[0], winSize[1]) * 0.05;
 
-    for (players) |player|
+    for (players.items, 0..players.items.len) |player, p|
     {
-      const pos = getSpacePos(board.value, player.pos);
+      const pos = getSpacePos(board.items, @intCast(p), player.value.pos) catch
+        unreachable;
 
+      _ = sdl.SDL_SetTextureColorModFloat(
+        playerTexture,
+        player.color[0],
+        player.color[1],
+        player.color[2]);
       if (!sdl.SDL_RenderTexture(
         mainspace.renderer, playerTexture, null,
         &.{
-          .x = pos[0],
-          .y = pos[1],
+          .x = pos[0] - size*0.5,
+          .y = pos[1] - size*0.5,
           .w = size,
           .h = size,
         }))
@@ -122,14 +121,94 @@ pub const scene = Scene{
   
   .deinit = struct {fn deinit() !void
   {
-    board.deinit();
+    board.deinit(gpa);
+    spaces.deinit(gpa);
+
+    players.deinit(gpa);
+
+    sdl.SDL_DestroyTexture(spaceHasTokenTexture);
+    sdl.SDL_DestroyTexture(spaceRerollTextures[0]);
+    sdl.SDL_DestroyTexture(spaceRerollTextures[1]);
+    for (spaceTypeTextures.values) |texture|
+    {
+      sdl.SDL_DestroyTexture(texture);
+    }
+    sdl.SDL_DestroyTexture(playerTexture);
   }}.deinit,
 };
 
+fn loadTextures() !void
+{
+  spaceHasTokenTexture = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath("assets/images/spaces/token_space.svg"));
+  spaceRerollTextures[0] = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath("assets/images/spaces/no_reroll.svg"));
+  spaceRerollTextures[1] = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath("assets/images/spaces/reroll.svg"));
+  inline for (0..spaceTypeTextures.values.len) |t|
+  {
+    const spaceType: Space.Type = @enumFromInt(t);
+
+    const filename = spaceType.toSnakeStr();
+    const path =
+      "assets/images/spaces/" ++ filename[0..filename.len-1] ++ ".svg";
+    log.debug("Loading \"{s}\"\n", .{path});
+
+    spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
+      mainspace.renderer,
+      try directoryManager.getPath(path));
+  }
+
+  playerTexture = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath("assets/images/player.svg"));
+}
+
 fn loadBoard(allocator: Allocator) !void
 {
+  const jsonOut =
+    try jsonFromFile(allocator, [][]Space, "assets/metadata/board.json");
+  defer jsonOut.deinit();
+
+  const spaceCount = blk:{
+    var spaceCount: u16 = 0;
+
+    for (jsonOut.value) |ring|
+    {
+      spaceCount += @intCast(ring.len);
+    }
+
+    break:blk spaceCount;
+  };
+
+  try spaces.ensureTotalCapacity(allocator, spaceCount);
+  try board.ensureTotalCapacity(allocator, jsonOut.value.len);
+
+  for (jsonOut.value) |ring|
+  {
+    board.append(
+      allocator,
+      spaces.items[spaces.items.len..spaces.items.len]) catch
+      unreachable;
+
+    for (ring) |space|
+    {
+      spaces.append(allocator, space) catch unreachable;
+
+      board.items[board.items.len-1].len += 1;
+    }
+  }
+}
+
+// Parsed data must be freed with .deinit()
+fn jsonFromFile(allocator: Allocator, T: type, path: []const u8)
+  !std.json.Parsed(T)
+{
   const boardFilePath =
-    try directoryManager.getPath("assets/metadata/board.json");
+    try directoryManager.getPath(path);
   var boardFile = try std.fs.openFileAbsolute(boardFilePath, .{});
   defer boardFile.close();
 
@@ -138,27 +217,18 @@ fn loadBoard(allocator: Allocator) !void
   var jsonReader = std.json.Reader.init(allocator, &fileReader.interface);
   defer jsonReader.deinit();
 
-  const spaces = try std.json.parseFromTokenSource(
-    [][]Space,
-    allocator,
-    &jsonReader,
-    .{});
-
-  board = spaces;
-
-  for (board.value) |ring|
-  {
-    totalSpaces += ring.len;
-  }
+  return try std.json.parseFromTokenSource(T, allocator, &jsonReader, .{});
 }
 
-fn renderSpaces(spaces: [][]Space) !void
+fn renderSpaces(spaceArr: [][]Space) !void
 {
-  for (spaces, 0..spaces.len) |ring, y|
+  for (spaceArr, 0..spaceArr.len) |ring, y|
   {
     for (ring, 0..ring.len) |space, x|
     {
-      try renderSpace(space, getSpacePos(spaces, .{@intCast(x), @intCast(y)}));
+      try renderSpace(
+        space,
+        try getSpacePos(spaceArr, null, .{@intCast(x), @intCast(y)}));
     }
   }
 }
@@ -171,10 +241,11 @@ fn renderRing(ring: []const Space, radius: f32) !void
   for (0..ring.len) |s|
   {
     const angle = ringStartAngle() + angleOffset*@as(f32, @floatFromInt(s));
+    const dir = WinCoord{@cos(angle), @sin(angle)};
 
     try renderSpace(
       ring[s],
-      center + WinCoord{cos(angle), sin(angle)}*@as(WinCoord, @splat(radius)));
+      center + dir*@as(WinCoord, @splat(radius)));
   }
 }
 
@@ -224,22 +295,35 @@ fn renderSpace(space: Space, pos: mainspace.WinCoord) !void
   }
 }
 
-pub fn getSpacePos(spaces: [][]Space, pos: BoardCoord) WinCoord
+pub fn getSpacePos(spaceArr: [][]Space, playerIndex: ?u8, pos: BoardCoord)
+  error{InvalidPos}!WinCoord
 {
-  if (pos == null or @reduce(.And, pos.? == Player.endingPos.?))
-  { // TODO: Put actual logic here
-    return .{0, 0};
+  const winSize = mainspace.winSize();
+  const center = winSize * @as(WinCoord, @splat(0.5));
+  
+  if (pos == Player.startingPos or @reduce(.And, pos.? == Player.endingPos.?))
+  {
+    const playerIndexF: f32 =
+      @floatFromInt(playerIndex orelse {return error.InvalidPos;});
+    const angle = std.math.pi*0.25 + playerIndexF * std.math.pi*0.5;
+
+    const dir = WinCoord{@cos(angle), @sin(angle)};
+    const dis =
+      if (pos == Player.startingPos)
+        @min(winSize[0], winSize[1]) * 0.6
+      else
+        10.0;
+
+    return center + dir*@as(WinCoord, @splat(dis));
   }
 
-  const center = mainspace.winSize() * @as(WinCoord, @splat(0.5));
-  
   const startAngle = ringStartAngle(pos.?[1]);
   const angleOffset =
-    (std.math.pi*2) / @as(f32, @floatFromInt(spaces[pos.?[1]].len));
+    (std.math.pi*2) / @as(f32, @floatFromInt(spaceArr[pos.?[1]].len));
   const angle = startAngle + angleOffset*@as(f32, @floatFromInt(pos.?[0]));
 
-  const dir = WinCoord{cos(angle), sin(angle)};
-  const radius = getRingRadius(@intCast(spaces.len), pos.?[1]);
+  const dir = WinCoord{@cos(angle), @sin(angle)};
+  const radius = getRingRadius(@intCast(spaceArr.len), pos.?[1]);
   return center + dir*@as(WinCoord, @splat(radius));
 }
 
