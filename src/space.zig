@@ -50,8 +50,7 @@ pub const Type = enum
 };
 
 reroll: bool,
-canHaveToken: bool,
+hasToken: ?bool = null,
 type: Type,
 jumpIndex: ?u8 = null,
 
-hasToken: bool = true,

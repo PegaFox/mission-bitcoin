@@ -11,6 +11,7 @@ const WinCoord = mainspace.WinCoord;
 const directoryManager = @import("../directory_manager.zig");
 
 const Space = @import("../space.zig");
+const Ring = @import("../ring.zig");
 const Player = @import("../player.zig");
 
 const BoardCoord = Player.Pos;
@@ -25,13 +26,24 @@ var spaceRerollTextures: [2]*sdl.SDL_Texture = undefined;
 var spaceTypeTextures =
   std.EnumArray(Space.Type, *sdl.SDL_Texture).initUndefined();
 
+var tokenTexture: *sdl.SDL_Texture = undefined;
+
 var playerTexture: *sdl.SDL_Texture = undefined;
 
 var spaces = std.ArrayList(Space).empty;
-var board = std.ArrayList([]Space).empty;
+pub var board = std.ArrayList(Ring).empty;
 
 const Color = @Vector(4, f32);
-var players: std.ArrayList(struct {color: Color, value: Player}) = .empty;
+pub const PlayerEntry = struct {
+  color: Color,
+  value: Player,
+};
+var players: std.ArrayList(PlayerEntry) = .empty;
+
+pub var currentPlayer: *PlayerEntry = undefined;
+
+//var moves: [4]BoardCoord = @splat(null);
+//var moveLength: u8 = 0;
 
 pub const scene = Scene{
   .keybinds = &.{},
@@ -43,16 +55,20 @@ pub const scene = Scene{
     try loadTextures();
 
     const jsonOut =
-      try jsonFromFile(allocator, [][3]f32, "assets/metadata/players.json");
+      try jsonFromFile(allocator, []struct {
+        color: [3]f32,
+        entryIndex: u8,
+      }, "assets/metadata/players.json");
     defer jsonOut.deinit();
 
     try players.ensureTotalCapacity(allocator, jsonOut.value.len);
     for (jsonOut.value) |player|
     {
       players.append(allocator, .{
-        .color = player ++ .{1.0},
+        .color = player.color ++ .{1.0},
         .value = .{
           .pos = Player.startingPos,
+          .entryIndex = player.entryIndex,
           .exchangeTokens = 0,
           .coldStorageTokens = 0,
           .lostTokens = 0,
@@ -61,6 +77,8 @@ pub const scene = Scene{
     }
 
     try loadBoard(allocator);
+
+    currentPlayer = &players.items[0];
 
     return &scene;
   }}.init,
@@ -71,14 +89,10 @@ pub const scene = Scene{
     mPos: @Vector(2, f32),
     mButtons: sdl.SDL_MouseButtonFlags) !bool
   {
+    _ = event;
     _ = keys;
     _ = mPos;
     _ = mButtons;
-
-    if (event.type == sdl.SDL_EVENT_KEY_DOWN)
-    {
-      _ = players.items[0].value.move(1);
-    }
 
     return true;
   }}.getInput,
@@ -95,10 +109,29 @@ pub const scene = Scene{
     const winSize = mainspace.winSize();
     const size = @min(winSize[0], winSize[1]) * 0.05;
 
+    //for (moves) |move|
+    //{
+    //  if (move == null) break;
+
+    //  const pos = try getSpacePos(board.items, null, move);
+    //  if (!sdl.SDL_RenderRect(
+    //    mainspace.renderer,
+    //    &.{
+    //      .x = pos[0] - size*0.5,
+    //      .y = pos[1] - size*0.5,
+    //      .w = size,
+    //      .h = size,
+    //    }))
+    //  {
+    //    return error.SDL_RenderFail;
+    //  }
+    //}
+
     for (players.items, 0..players.items.len) |player, p|
     {
-      const pos = getSpacePos(board.items, @intCast(p), player.value.pos) catch
-        unreachable;
+      const pos =
+        boardToWindowPos(board.items, @intCast(p), player.value.pos) catch
+          unreachable;
 
       _ = sdl.SDL_SetTextureColorModFloat(
         playerTexture,
@@ -162,6 +195,10 @@ fn loadTextures() !void
       try directoryManager.getPath(path));
   }
 
+  tokenTexture = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath("assets/images/token.svg"));
+
   playerTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
     try directoryManager.getPath("assets/images/player.svg"));
@@ -191,14 +228,22 @@ fn loadBoard(allocator: Allocator) !void
   {
     board.append(
       allocator,
-      spaces.items[spaces.items.len..spaces.items.len]) catch
+      .{
+        .spaces = spaces.items[spaces.items.len..spaces.items.len],
+        .tokenCount = 0,
+      }) catch
       unreachable;
 
     for (ring) |space|
     {
       spaces.append(allocator, space) catch unreachable;
 
-      board.items[board.items.len-1].len += 1;
+      if (space.hasToken == true)
+      {
+        board.items[board.items.len-1].tokenCount += 1;
+      }
+      
+      board.items[board.items.len-1].spaces.len += 1;
     }
   }
 }
@@ -220,15 +265,37 @@ fn jsonFromFile(allocator: Allocator, T: type, path: []const u8)
   return try std.json.parseFromTokenSource(T, allocator, &jsonReader, .{});
 }
 
-fn renderSpaces(spaceArr: [][]Space) !void
+fn renderSpaces(spaceArr: []Ring) !void
 {
   for (spaceArr, 0..spaceArr.len) |ring, y|
   {
-    for (ring, 0..ring.len) |space, x|
+    for (ring.spaces, 0..ring.spaces.len) |space, x|
     {
-      try renderSpace(
-        space,
-        try getSpacePos(spaceArr, null, .{@intCast(x), @intCast(y)}));
+      const pos =
+        try boardToWindowPos(spaceArr, null, .{@intCast(x), @intCast(y)});
+
+      if (space.jumpIndex) |i|
+      {
+        const linkPos =
+          try boardToWindowPos(spaceArr, null, .{i, @intCast(y+1)});
+
+        if (!sdl.SDL_SetRenderDrawColorFloat(
+          mainspace.renderer,
+          1.0, 0.5, 0.0, 1.0))
+        {
+          return error.SDL_RenderFail;
+        }
+
+        if (!sdl.SDL_RenderLine(
+          mainspace.renderer,
+          pos[0], pos[1],
+          linkPos[0], linkPos[1]))
+        {
+          return error.SDL_RenderFail;
+        }
+      }
+
+      try renderSpace(space, pos);
     }
   }
 }
@@ -254,48 +321,56 @@ fn renderSpace(space: Space, pos: mainspace.WinCoord) !void
   const winSize = mainspace.winSize();
   const radius = @min(winSize[0], winSize[1]) * 0.025;
 
-  //const radius = 20;
+  var noErr = true;
 
-  if (space.canHaveToken)
+  if (space.hasToken != null)
   {
-    if (!sdl.SDL_RenderTexture(
+    noErr &= sdl.SDL_RenderTexture(
       mainspace.renderer, spaceHasTokenTexture, null,
       &.{
         .x = pos[0]-radius,
         .y = pos[1]-radius,
         .w = radius*2,
         .h = radius*2,
-      }))
-    {
-      return error.SDL_RenderFail;
-    }
+      }
+    );
   }
-
-  if (!sdl.SDL_RenderTexture(
+  noErr &= sdl.SDL_RenderTexture(
     mainspace.renderer, spaceRerollTextures[@intFromBool(space.reroll)], null,
     &.{
       .x = pos[0]-radius,
       .y = pos[1]-radius,
       .w = radius*2,
       .h = radius*2,
-    }))
-  {
-    return error.SDL_RenderFail;
-  }
-  if (!sdl.SDL_RenderTexture(
+    });
+  noErr &= sdl.SDL_RenderTexture(
     mainspace.renderer, spaceTypeTextures.get(space.type), null,
     &.{
       .x = pos[0]-radius,
       .y = pos[1]-radius,
       .w = radius*2,
       .h = radius*2,
-    }))
+    });
+  if (space.hasToken == true)
+  {
+    noErr &= sdl.SDL_RenderTexture(
+      mainspace.renderer, tokenTexture, null,
+      &.{
+        .x = pos[0]-radius,
+        .y = pos[1]-radius,
+        .w = radius*2,
+        .h = radius*2,
+      }
+    );
+  }
+
+  if (!noErr)
   {
     return error.SDL_RenderFail;
   }
 }
 
-pub fn getSpacePos(spaceArr: [][]Space, playerIndex: ?u8, pos: BoardCoord)
+pub fn boardToWindowPos(spaceArr: []Ring, playerIndex: ?u8, pos: BoardCoord)
   error{InvalidPos}!WinCoord
 {
   const winSize = mainspace.winSize();
@@ -319,12 +394,43 @@ pub fn getSpacePos(spaceArr: [][]Space, playerIndex: ?u8, pos: BoardCoord)
 
   const startAngle = ringStartAngle(pos.?[1]);
   const angleOffset =
-    (std.math.pi*2) / @as(f32, @floatFromInt(spaceArr[pos.?[1]].len));
+    (std.math.pi*2) / @as(f32, @floatFromInt(spaceArr[pos.?[1]].spaces.len));
   const angle = startAngle + angleOffset*@as(f32, @floatFromInt(pos.?[0]));
 
   const dir = WinCoord{@cos(angle), @sin(angle)};
   const radius = getRingRadius(@intCast(spaceArr.len), pos.?[1]);
   return center + dir*@as(WinCoord, @splat(radius));
+}
+
+pub fn windowToBoardPos(spaceArr: []Ring, pos: WinCoord) BoardCoord
+{
+  const ringCount: f32 = @floatFromInt(spaceArr.len);
+
+  const winSize = mainspace.winSize();
+  const center = winSize * @as(WinCoord, @splat(0.5));
+
+  const dis = std.math.hypot(pos[0] - center[0], pos[1] - center[1]);
+
+  const maxRadius = getRingRadius(@intCast(spaceArr.len), 0);
+  const radiusOffset = maxRadius / ringCount;
+
+  const ringIndex: u8 = @intFromFloat(std.math.clamp(
+    ringCount-@round(dis/radiusOffset),
+    0, ringCount-1
+  ));
+
+  const ringLen: f32 = @floatFromInt(spaceArr[ringIndex].spaces.len);
+
+  const angle =
+    -std.math.atan2(pos[0] - center[0], pos[1] - center[1]) +
+    std.math.pi*0.5 -
+    ringStartAngle(ringIndex);
+  const angleOffset = std.math.pi*2 / ringLen;
+
+  const spaceIndex: u8 =
+    @intFromFloat(@mod(@round(angle / angleOffset), ringLen));
+
+  return .{spaceIndex, @intCast(std.math.clamp(ringIndex, 0, spaceArr.len-1))};
 }
 
 pub fn getRingRadius(ringCount: u8, index: u8) f32

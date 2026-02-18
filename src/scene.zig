@@ -10,14 +10,14 @@ const sdl = mainspace.sdl;
 
 pub const ID = enum
 {
-  Game
+  Game,
+  Interface,
 };
 
 pub const scenes = std.EnumArray(ID, Self).init(.{
   .Game = @import("scenes/game.zig").scene,
+  .Interface = @import("scenes/interface.zig").scene,
 });
-
-
 
 keybinds: []struct {
   key: []const u8,

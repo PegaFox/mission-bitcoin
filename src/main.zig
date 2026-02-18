@@ -37,6 +37,9 @@ pub fn winSize() WinCoord
   return .{@floatFromInt(size[0]), @floatFromInt(size[1])};
 }
 
+var randomEngine: std.Random.DefaultPrng = undefined;
+pub var rand = randomEngine.random();
+
 pub var running = true;
 var lastFrameTick: u64 = 0;
 
@@ -48,6 +51,8 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl
   _ = argc;
   _ = argv;
   startTime = @intCast(std.time.nanoTimestamp());
+
+  randomEngine = .init(@intCast(@abs(std.time.milliTimestamp())));
 
   log.info("loading default world layout\n", .{});
 
@@ -109,6 +114,10 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
         };
       }
 
+      if (!sdl.SDL_SetRenderDrawColorFloat(renderer, 0.0, 0.0, 0.0, 1.0))
+      {
+        log.err("Failed to set clear color\n", .{});
+      }
       if (!sdl.SDL_RenderClear(renderer))
       {
         log.err("Failed to clear screen\n", .{});
