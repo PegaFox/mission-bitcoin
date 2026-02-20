@@ -69,6 +69,11 @@ pub fn getMoves(self: *Self, parent: []Ring, steps: u8) [4]Pos
       continue;
     }
 
+    if (parent[top.pos[1]].spaces[top.pos[0]].type == .Moon)
+    {
+      continue;
+    }
+
     if (parent[top.pos[1]].tokenCount == 0)
     {
       if (parent[top.pos[1]].spaces[top.pos[0]].jumpIndex) |jumpIndex|
@@ -142,8 +147,43 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos) void
 {
   self.pos = pos;
 
-  if (pos != null and parent[pos.?[1]].spaces[pos.?[0]].hasToken == true)
+  const ring = &parent[pos.?[1]];
+  const space = &ring.spaces[pos.?[0]];
+
+  if (pos != null and space.hasToken == true)
   {
-    _ = parent[pos.?[1]].removeToken(pos.?[0]);
+    self.exchangeTokens += @intFromBool(ring.removeToken(pos.?[0]));
+  }
+
+  switch (space.type)
+  {
+    .Default => {},
+    .ColdStorage => {
+      self.coldStorageTokens += self.exchangeTokens;
+      self.exchangeTokens = 0;
+    },
+    .ExchangeHack => {
+      self.lostTokens += self.exchangeTokens;
+      self.exchangeTokens = 0;
+    },
+    .OrangePill => {
+      // TODO: When this space is landed on, the current player should select another player to give one token to
+    },
+    .Exec6102 => {
+      for (game.players.items) |*player|
+      {
+        player.value.lostTokens = 0;
+        player.value.exchangeTokens = 0;
+      }
+    },
+    .Moon => {
+      self.coldStorageTokens += self.lostTokens;
+      self.lostTokens = 0;
+    },
+  }
+
+  if (!space.reroll)
+  {
+    game.nextTurn();
   }
 }

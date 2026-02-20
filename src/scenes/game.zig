@@ -38,9 +38,16 @@ pub const PlayerEntry = struct {
   color: Color,
   value: Player,
 };
-var players: std.ArrayList(PlayerEntry) = .empty;
+pub var players: std.ArrayList(PlayerEntry) = .empty;
 
-pub var currentPlayer: *PlayerEntry = undefined;
+pub var currentPlayer: u8 = undefined;
+
+// Updates currentPlayerIndex and currentPlayer to be the next in line
+pub fn nextTurn() void
+{
+  currentPlayer =
+    (currentPlayer + 1) % @as(u8, @intCast(players.items.len));
+}
 
 //var moves: [4]BoardCoord = @splat(null);
 //var moveLength: u8 = 0;
@@ -78,7 +85,8 @@ pub const scene = Scene{
 
     try loadBoard(allocator);
 
-    currentPlayer = &players.items[0];
+    currentPlayer =
+      mainspace.rand.uintLessThan(u8, @intCast(players.items.len));
 
     return &scene;
   }}.init,
@@ -150,6 +158,8 @@ pub const scene = Scene{
         return error.SDL_RenderFail;
       }
     }
+
+    try renderTokenStack(@splat(256), 8);
   }}.render,
   
   .deinit = struct {fn deinit() !void
@@ -221,13 +231,12 @@ fn loadBoard(allocator: Allocator) !void
     break:blk spaceCount;
   };
 
-  try spaces.ensureTotalCapacity(allocator, spaceCount);
-  try board.ensureTotalCapacity(allocator, jsonOut.value.len);
+  try spaces.ensureTotalCapacity(allocator, spaceCount+1);
+  try board.ensureTotalCapacity(allocator, jsonOut.value.len+1);
 
   for (jsonOut.value) |ring|
   {
-    board.append(
-      allocator,
+    board.append(allocator,
       .{
         .spaces = spaces.items[spaces.items.len..spaces.items.len],
         .tokenCount = 0,
@@ -246,6 +255,15 @@ fn loadBoard(allocator: Allocator) !void
       board.items[board.items.len-1].spaces.len += 1;
     }
   }
+
+  spaces.append(allocator, .{
+    .reroll = false,
+    .type = .Moon,
+  }) catch unreachable;
+  board.append(allocator, .{
+    .spaces = spaces.items[spaces.items.len-1..spaces.items.len],
+    .tokenCount = 0,
+  }) catch unreachable;
 }
 
 // Parsed data must be freed with .deinit()
@@ -370,6 +388,26 @@ fn renderSpace(space: Space, pos: mainspace.WinCoord) !void
   }
 }
 
+fn renderTokenStack(pos: WinCoord, count: TokenType) !void
+{
+  for (0..count) |t|
+  {
+    if (!sdl.SDL_RenderTextureAffine(mainspace.renderer, tokenTexture, null, &.{
+        .x = pos[0],
+        .y = pos[1] - @as(f32, @floatFromInt(t*3)),
+      }, &.{
+        .x = pos[0] + 20,
+        .y = pos[1] - @as(f32, @floatFromInt(t*3)),
+      }, &.{
+        .x = pos[0],
+        .y = pos[1] + 10 - @as(f32, @floatFromInt(t*3)),
+      }))
+    {
+      return error.SDL_RenderFail;
+    }
+  }
+}
+
 pub fn boardToWindowPos(spaceArr: []Ring, playerIndex: ?u8, pos: BoardCoord)
   error{InvalidPos}!WinCoord
 {
@@ -412,10 +450,10 @@ pub fn windowToBoardPos(spaceArr: []Ring, pos: WinCoord) BoardCoord
   const dis = std.math.hypot(pos[0] - center[0], pos[1] - center[1]);
 
   const maxRadius = getRingRadius(@intCast(spaceArr.len), 0);
-  const radiusOffset = maxRadius / ringCount;
+  const radiusOffset = maxRadius / (ringCount-1);
 
   const ringIndex: u8 = @intFromFloat(std.math.clamp(
-    ringCount-@round(dis/radiusOffset),
+    ringCount-@round(dis/radiusOffset)-1,
     0, ringCount-1
   ));
 
@@ -438,7 +476,7 @@ pub fn getRingRadius(ringCount: u8, index: u8) f32
   const winSize = mainspace.winSize();
   const maxRadius = @min(winSize[0], winSize[1]) * 0.45;
 
-  const radiusOffset = maxRadius / @as(f32, @floatFromInt(ringCount));
+  const radiusOffset = maxRadius / @as(f32, @floatFromInt(ringCount-1));
 
   return maxRadius - radiusOffset*@as(f32, @floatFromInt(index));
 }

@@ -33,7 +33,7 @@ pub const scene = Scene{
       try directoryManager.getPath("assets/images/selected.svg")
     );
 
-    moves = game.currentPlayer.value.getMoves(
+    moves = game.players.items[game.currentPlayer].value.getMoves(
       game.board.items,
       mainspace.rand.intRangeAtMost(u8, 1, 6)
     );
@@ -63,9 +63,12 @@ pub const scene = Scene{
 
         if (@reduce(.And, move.? == selected.?))
         {
-          game.currentPlayer.value.move(game.board.items, move);
+          var currentPlayer = &game.players.items[game.currentPlayer].value;
+          currentPlayer.move(game.board.items, move);
 
-          moves = game.currentPlayer.value.getMoves(
+          // We update this in case the current player has changed
+          currentPlayer = &game.players.items[game.currentPlayer].value;
+          moves = currentPlayer.getMoves(
             game.board.items,
             mainspace.rand.intRangeAtMost(u8, 1, 6)
           );
@@ -83,14 +86,19 @@ pub const scene = Scene{
   
   .render = struct {fn render() !void
   {
+    var timeOffset: f32 = 
+      @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
+    timeOffset = @sin(timeOffset * 0.002 * std.math.pi);
+
     const winSize = mainspace.winSize();
     //const center = winSize * @as(mainspace.WinCoord, @splat(0.5));
-    const radius = @min(winSize[0], winSize[1]) * 0.025;
+    const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.002);
 
+    const currentPlayer = &game.players.items[game.currentPlayer];
     if (!sdl.SDL_SetTextureColorModFloat(selectedTexture,
-      game.currentPlayer.color[0],
-      game.currentPlayer.color[1],
-      game.currentPlayer.color[2]))
+      currentPlayer.color[0],
+      currentPlayer.color[1],
+      currentPlayer.color[2]))
     {
       return error.SDL_RenderFail;
     }
@@ -119,19 +127,6 @@ pub const scene = Scene{
     //const pos =
     //  game.boardToWindowPos(game.board.items, null, hoveredSpace()) catch
     //    return;
-    //const dis = std.math.hypot(pos[0] - center[0], pos[1] - center[1]);
-
-    //if (!sdl.SDL_RenderTexture(
-    //  mainspace.renderer, selectedTexture, null,
-    //  &.{
-    //    .x = center[0] - dis,
-    //    .y = center[1] - dis,
-    //    .w = dis*2,
-    //    .h = dis*2,
-    //  }))
-    //{
-    //  return error.SDL_RenderFail;
-    //}
 
     //if (!sdl.SDL_RenderTexture(
     //  mainspace.renderer, selectedTexture, null,

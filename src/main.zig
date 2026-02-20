@@ -41,7 +41,7 @@ var randomEngine: std.Random.DefaultPrng = undefined;
 pub var rand = randomEngine.random();
 
 pub var running = true;
-var lastFrameTick: u64 = 0;
+var lastFrameTick: i64 = 0;
 
 pub var allocator = AllocatorType(.{}).init;
 
@@ -101,9 +101,9 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
 
   if (sdl.SDL_GetWindowFlags(window) & sdl.SDL_WINDOW_INPUT_FOCUS > 0)
   {
-    if (sdl.SDL_GetTicks() - lastFrameTick > std.time.ms_per_s / 60)
+    if (std.time.milliTimestamp() - lastFrameTick > std.time.ms_per_s / 60)
     {
-      lastFrameTick = sdl.SDL_GetTicks();
+      lastFrameTick = std.time.milliTimestamp();
 
       for (Scene.scenes.values) |scene|
       {

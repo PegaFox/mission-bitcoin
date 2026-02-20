@@ -7,6 +7,7 @@ pub const Type = enum
   ExchangeHack,
   OrangePill,
   Exec6102,
+  Moon,
 
   pub inline fn toSnakeStr(comptime self: Type) [:0]const u8
   {

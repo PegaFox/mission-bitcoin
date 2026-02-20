@@ -52,7 +52,7 @@
     {"reroll": false,                   "type": "ColdStorage"},
     {"reroll": true,                    "type": "OrangePill"},
     {"reroll": false,                   "type": "ColdStorage"},
-    {"reroll": true,  "hasToken": true, "type": "Default"},
+    {"reroll": true,  "hasToken": true, "type": "Default", "jumpIndex": 0},
     {"reroll": true,                    "type": "ColdStorage"},
     {"reroll": false,                   "type": "ColdStorage"},
     {"reroll": false,                   "type": "ColdStorage"},
