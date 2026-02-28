@@ -32,7 +32,14 @@ pub fn winSize() WinCoord
 {
   var size: @Vector(2, c_int) = undefined;
   
-  if (!sdl.SDL_GetWindowSize(window, &size[0], &size[1])) unreachable;
+  if (!sdl.SDL_GetRenderLogicalPresentation(renderer, &size[0], &size[1], null))
+    unreachable;
+
+  if (@reduce(.And, size == @as(@TypeOf(size), @splat(0))))
+  {
+    if (!sdl.SDL_GetWindowSize(window, &size[0], &size[1]))
+      unreachable;
+  }
 
   return .{@floatFromInt(size[0]), @floatFromInt(size[1])};
 }
@@ -82,6 +89,13 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl
 
     break:blk .{optionalWindow.?, optionalRenderer.?};
   };
+
+  //if (!sdl.SDL_SetRenderLogicalPresentation(renderer,
+  //  512, 512,
+  //  sdl.SDL_LOGICAL_PRESENTATION_LETTERBOX))
+  //{
+  //  return sdl.SDL_APP_FAILURE;
+  //}
 
   for (Scene.scenes.values) |scene|
   {

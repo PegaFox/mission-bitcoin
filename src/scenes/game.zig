@@ -112,9 +112,16 @@ pub const scene = Scene{
   
   .render = struct {fn render() !void
   {
+    _ = sdl.SDL_SetRenderViewport(mainspace.renderer, &.{
+      .x = @intFromFloat(boardRenderArea()[0][0]),
+      .y = @intFromFloat(boardRenderArea()[0][1]),
+      .w = @intFromFloat(boardRenderArea()[1][0]),
+      .h = @intFromFloat(boardRenderArea()[1][1]),
+    });
+
     try renderSpaces(board.items);
 
-    const winSize = mainspace.winSize();
+    const winSize = boardRenderArea()[1];
     const size = @min(winSize[0], winSize[1]) * 0.05;
 
     //for (moves) |move|
@@ -159,7 +166,9 @@ pub const scene = Scene{
       }
     }
 
-    try renderTokenStack(@splat(256), 8);
+    _ = sdl.SDL_SetRenderViewport(mainspace.renderer, null);
+
+    try renderPlayerWallets();
   }}.render,
   
   .deinit = struct {fn deinit() !void
@@ -320,7 +329,7 @@ fn renderSpaces(spaceArr: []Ring) !void
 
 fn renderRing(ring: []const Space, radius: f32) !void
 {
-  const center = mainspace.winSize() * @as(WinCoord, @splat(0.5));
+  const center = boardRenderCenter();
 
   const angleOffset = (std.math.pi*2) / @as(f32, @floatFromInt(ring.len));
   for (0..ring.len) |s|
@@ -336,7 +345,7 @@ fn renderRing(ring: []const Space, radius: f32) !void
 
 fn renderSpace(space: Space, pos: mainspace.WinCoord) !void
 {
-  const winSize = mainspace.winSize();
+  const winSize = boardRenderArea()[1];
   const radius = @min(winSize[0], winSize[1]) * 0.025;
 
   var noErr = true;
@@ -388,19 +397,125 @@ fn renderSpace(space: Space, pos: mainspace.WinCoord) !void
   }
 }
 
-fn renderTokenStack(pos: WinCoord, count: TokenType) !void
+fn renderPlayerWallets() !void
+{
+  const renderArea = walletRenderArea();
+
+  const walletSize: WinCoord = .{
+    renderArea[1][0] / @as(f32, @floatFromInt(players.items.len)),
+    renderArea[1][1]
+  };
+
+  const tokenRadius: f32 = @min(
+    walletSize[0]*0.2,
+    walletSize[1]*0.3,
+    renderArea[1][0]*0.02,
+  );
+
+  for (0..players.items.len, players.items) |p, player|
+  {
+    const walletArea: [2]WinCoord = .{
+      .{walletSize[0] * @as(f32, @floatFromInt(p)), renderArea[0][1]},
+      .{walletSize[0], walletSize[1]},
+    };
+
+    if (!sdl.SDL_SetRenderDrawColorFloat(
+      mainspace.renderer,
+      player.color[0],
+      player.color[1],
+      player.color[2],
+      player.color[3]))
+    {
+      return error.SDL_RenderFail;
+    }
+    if (!sdl.SDL_RenderFillRect(
+      mainspace.renderer, &.{
+        .x = walletArea[0][0],
+        .y = walletArea[0][1],
+        .w = walletArea[1][0],
+        .h = walletArea[1][1],
+      }))
+    {
+      return error.SDL_RenderFail;
+    }
+
+    if (!sdl.SDL_SetRenderDrawColorFloat(
+      mainspace.renderer,
+      1.0,
+      0.0,
+      0.0,
+      1.0))
+    {
+      return error.SDL_RenderFail;
+    }
+    if (!sdl.SDL_RenderRect(
+      mainspace.renderer, &.{
+        .x = walletArea[0][0] + walletArea[1][0]*0.05,
+        .y = walletArea[0][1] + walletArea[1][1]*0.025,
+        .w = walletArea[1][0]*0.4,
+        .h = walletArea[1][1]*0.95,
+      }))
+    {
+      return error.SDL_RenderFail;
+    }
+    try renderTokenStack(
+      .{
+        walletArea[0][0] + walletArea[1][0]*0.25,
+        walletArea[0][1] + walletArea[1][1]*0.95
+      },
+      tokenRadius,
+      player.value.exchangeTokens
+    );
+
+    if (!sdl.SDL_SetRenderDrawColorFloat(
+      mainspace.renderer,
+      0.0,
+      0.0,
+      1.0,
+      1.0))
+    {
+      return error.SDL_RenderFail;
+    }
+    if (!sdl.SDL_RenderRect(
+      mainspace.renderer, &.{
+        .x = walletArea[0][0] + walletArea[1][0]*0.55,
+        .y = walletArea[0][1] + walletArea[1][1]*0.025,
+        .w = walletArea[1][0]*0.4,
+        .h = walletArea[1][1]*0.95,
+      }))
+    {
+      return error.SDL_RenderFail;
+    }
+    try renderTokenStack(
+      .{
+        walletArea[0][0] + walletArea[1][0]*0.75,
+        walletArea[0][1] + walletArea[1][1]*0.95
+      },
+      tokenRadius,
+      player.value.coldStorageTokens
+    );
+
+    try renderTokenStack(
+      try boardToWindowPos(board.items, @intCast(p), Player.endingPos),
+      20,
+      player.value.lostTokens
+    );
+  }
+}
+
+fn renderTokenStack(pos: WinCoord, radius: f32, count: TokenType) !void
 {
   for (0..count) |t|
   {
     if (!sdl.SDL_RenderTextureAffine(mainspace.renderer, tokenTexture, null, &.{
-        .x = pos[0],
-        .y = pos[1] - @as(f32, @floatFromInt(t*3)),
+        .x = pos[0] - radius,
+        .y = pos[1] - radius - @as(f32, @floatFromInt(t))*radius*0.1,
       }, &.{
-        .x = pos[0] + 20,
-        .y = pos[1] - @as(f32, @floatFromInt(t*3)),
+        .x = pos[0] + radius,
+        .y = pos[1] - radius - @as(f32, @floatFromInt(t))*radius*0.1,
       }, &.{
-        .x = pos[0],
-        .y = pos[1] + 10 - @as(f32, @floatFromInt(t*3)),
+        .x = pos[0] - radius,
+        .y = pos[1] - @as(f32, @floatFromInt(t))*radius*0.1,
       }))
     {
       return error.SDL_RenderFail;
@@ -411,8 +526,8 @@ fn renderTokenStack(pos: WinCoord, count: TokenType) !void
 pub fn boardToWindowPos(spaceArr: []Ring, playerIndex: ?u8, pos: BoardCoord)
   error{InvalidPos}!WinCoord
 {
-  const winSize = mainspace.winSize();
-  const center = winSize * @as(WinCoord, @splat(0.5));
+  const winSize = boardRenderArea()[1];
+  const center = boardRenderCenter();
   
   if (pos == Player.startingPos or @reduce(.And, pos.? == Player.endingPos.?))
   {
@@ -444,8 +559,7 @@ pub fn windowToBoardPos(spaceArr: []Ring, pos: WinCoord) BoardCoord
 {
   const ringCount: f32 = @floatFromInt(spaceArr.len);
 
-  const winSize = mainspace.winSize();
-  const center = winSize * @as(WinCoord, @splat(0.5));
+  const center = boardRenderCenter();
 
   const dis = std.math.hypot(pos[0] - center[0], pos[1] - center[1]);
 
@@ -473,7 +587,7 @@ pub fn windowToBoardPos(spaceArr: []Ring, pos: WinCoord) BoardCoord
 
 pub fn getRingRadius(ringCount: u8, index: u8) f32
 {
-  const winSize = mainspace.winSize();
+  const winSize = boardRenderArea()[1];
   const maxRadius = @min(winSize[0], winSize[1]) * 0.45;
 
   const radiusOffset = maxRadius / @as(f32, @floatFromInt(ringCount-1));
@@ -484,4 +598,25 @@ pub fn getRingRadius(ringCount: u8, index: u8) f32
 fn ringStartAngle(ringIndex: u8) f32
 {
   return @as(f32, @floatFromInt(ringIndex % 2)) * 0.1;
+}
+
+pub fn boardRenderArea() [2]WinCoord
+{
+  const winSize = mainspace.winSize();
+
+  return .{@splat(0), .{winSize[0], winSize[1]*0.8}};
+}
+
+fn boardRenderCenter() WinCoord
+{
+  const winSize = boardRenderArea();
+
+  return (winSize[0]+winSize[1]) * @as(WinCoord, @splat(0.5));
+}
+
+fn walletRenderArea() [2]WinCoord
+{
+  const winSize = mainspace.winSize();
+
+  return .{.{winSize[0], winSize[1]*0.8}, .{winSize[0], winSize[1]*0.2}};
 }

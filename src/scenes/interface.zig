@@ -90,7 +90,7 @@ pub const scene = Scene{
       @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
     timeOffset = @sin(timeOffset * 0.002 * std.math.pi);
 
-    const winSize = mainspace.winSize();
+    const winSize = game.boardRenderArea()[1];
     //const center = winSize * @as(mainspace.WinCoord, @splat(0.5));
     const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.002);
 

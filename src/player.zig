@@ -159,12 +159,15 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos) void
   {
     .Default => {},
     .ColdStorage => {
-      self.coldStorageTokens += self.exchangeTokens;
-      self.exchangeTokens = 0;
+      //self.coldStorageTokens += self.exchangeTokens;
+      //self.exchangeTokens = 0;
     },
     .ExchangeHack => {
-      self.lostTokens += self.exchangeTokens;
-      self.exchangeTokens = 0;
+      for (game.players.items) |*player|
+      {
+        player.value.lostTokens += player.value.exchangeTokens;
+        player.value.exchangeTokens = 0;
+      }
     },
     .OrangePill => {
       // TODO: When this space is landed on, the current player should select another player to give one token to
