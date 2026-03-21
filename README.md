@@ -26,3 +26,4 @@
 - Add networking
 - Add movement animations
 - Add menus
+- Remove emscripten dependency

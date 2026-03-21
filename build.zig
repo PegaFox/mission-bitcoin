@@ -6,6 +6,8 @@ const LazyPath = std.Build.LazyPath;
 
 const projectZon = @import("build.zig.zon");
 
+const wasm = @import("wasm.zig");
+
 const TargetInfo = struct {
   target: Target.Query,
   build: *const fn (b: *std.Build, mod: *Module) void,
@@ -30,23 +32,23 @@ const availableTargets = [_]TargetInfo{
     .build = buildPc,
     .name = "windows",
   },
-  .{
-    .target = .{
-      .cpu_arch = .aarch64,
-      .os_tag = .linux,
-      .abi = .android,
-    },
-    .build = buildAndroid,
-    .name = "android",
-  },
   //.{
   //  .target = .{
-  //    .cpu_arch = .wasm32,
-  //    .os_tag = .freestanding,
+  //    .cpu_arch = .aarch64,
+  //    .os_tag = .linux,
+  //    .abi = .android,
   //  },
-  //  .build = buildWasm,
-  //  .name = "wasm",
+  //  .build = buildAndroid,
+  //  .name = "android",
   //},
+  .{
+    .target = .{
+      .cpu_arch = .wasm32,
+      .os_tag = .emscripten,
+    },
+    .build = wasm.build,
+    .name = "wasm",
+  },
 };
 
 pub fn build(b: *std.Build) void {
@@ -222,48 +224,46 @@ fn buildPc(b: *std.Build, mod: *Module) void
 
 fn buildAndroid(b: *std.Build, mod: *Module) void
 {
-  _ = b;
-  _ = mod;
-}
+  const sdl = b.dependency("sdl", .{
+    .optimize = mod.optimize,
+    .target = mod.resolved_target,
+  });
+    
+  const sdlImage = b.dependency("SDL_image", .{
+    .optimize = mod.optimize,
+    .target = mod.resolved_target,
+  });
+    
+  const sdlTTF = b.dependency("SDL_ttf", .{
+    .optimize = mod.optimize,
+    .target = mod.resolved_target,
+  });
 
-fn buildWasm(b: *std.Build, mod: *Module) void
-{
-  const emInclude = LazyPath{
-    .cwd_relative = "/usr/lib/emsdk/upstream/emscripten/cache/sysroot/include"
-  };
+  mod.addIncludePath(sdl.path("include/SDL3"));
+  for (sdlImage.artifact("SDL3_image").root_module.include_dirs.items) |dir|
+  {
+    if (dir == .path and std.mem.eql(u8, dir.path.basename(b, null), "include"))
+    {
+      mod.addIncludePath(dir.path.path(b, "SDL3_image"));
+    }
+  }
 
-  mod.addIncludePath(emInclude);
-  mod.addIncludePath(emInclude.path(b, "SDL2"));
+  for (sdlTTF.artifact("SDL3_ttf").root_module.include_dirs.items) |dir|
+  {
+    if (dir == .path and std.mem.eql(u8, dir.path.basename(b, null), "include"))
+    {
+      mod.addIncludePath(dir.path.path(b, "SDL3_ttf"));
+    }
+  }
 
-  const obj = b.addObject(.{
+  mod.linkLibrary(sdl.artifact("SDL3"));
+  mod.linkLibrary(sdlImage.artifact("SDL3_image"));
+  mod.linkLibrary(sdlTTF.artifact("SDL3_ttf"));
+
+  const exe = b.addExecutable(.{
     .name = @tagName(projectZon.name),
     .root_module = mod,
   });
 
-  const htmlName = std.mem.concat(
-    b.allocator,
-    u8,
-    &.{obj.name, ".html"}) catch "em.html";
-  const wasmName = std.mem.concat(
-    b.allocator,
-    u8,
-    &.{obj.name, ".wasm"}) catch "em.wasm";
-
-  const emLink = b.addSystemCommand(&.{"emcc"});
-  emLink.addArtifactArg(obj);
-  emLink.addArg("--use-port=sdl2");
-  emLink.addArg(switch (mod.optimize.?)
-  {
-    .Debug => "-O0",
-    .ReleaseSafe => "-O0",
-    .ReleaseSmall => "-Os",
-    .ReleaseFast => "-O3",
-  });
-  emLink.addArg("-o");
-  const htmlOut = emLink.addOutputFileArg(htmlName);
-  const wasmOut = htmlOut.dirname().path(b, wasmName);
-
-  //b.installArtifact(exe);
-  b.getInstallStep().dependOn(&b.addInstallBinFile(htmlOut, htmlName).step);
-  b.getInstallStep().dependOn(&b.addInstallBinFile(wasmOut, wasmName).step);
+  b.installArtifact(exe);
 }

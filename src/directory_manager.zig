@@ -1,3 +1,5 @@
+const builtin = @import("builtin");
+
 const std = @import("std");
 const log = std.log;
 const fs = std.fs;
@@ -6,13 +8,16 @@ const Dir = fs.Dir;
 
 const mainspace = @import("main.zig");
 
-var resourcePaths = [_]?[fs.max_path_bytes]u8{
+// I use a custom value because freestanding OS has no defined max
+const pathMaxSize = 1024;
+
+var resourcePaths = [_]?[pathMaxSize]u8{
   null, // cwdPath
   null, // exeDirPath
   null, // dataDirPath
 };
 
-var pathBuffer: [fs.max_path_bytes]u8 = undefined;
+var pathBuffer: [pathMaxSize]u8 = undefined;
 var pathAllocator = std.heap.FixedBufferAllocator.init(&pathBuffer);
 
 /// Returns a slice that is valid until the next call to a function in this file
@@ -66,14 +71,34 @@ fn findResourcePaths() void
 
   var pathSlice: []const u8 = undefined;
 
-  pathSlice = fs.realpath(".", &pathBuffer) catch "";
-  if (pathSlice.len > 0) @memcpy(resourcePaths[0].?[0..pathSlice.len], pathSlice) else resourcePaths[0] = null;
+  // Paths must be absolute, but realpath is buggy so this is removed for now
+  //pathSlice = fs.realpath(".", &pathBuffer) catch "";
+  //if (pathSlice.len > 0)
+  //  @memcpy(resourcePaths[0].?[0..pathSlice.len], pathSlice)
+  //else
+  //  resourcePaths[0] = null;
 
-  pathSlice = fs.selfExeDirPath(&pathBuffer) catch "";
-  if (pathSlice.len > 0) @memcpy(resourcePaths[1].?[0..pathSlice.len], pathSlice) else resourcePaths[1] = null;
+  pathSlice = "/";
+  @memcpy(resourcePaths[0].?[0..pathSlice.len], pathSlice);
 
-  pathSlice = fs.getAppDataDir(pathAllocator.allocator(), "mission_bitcoin") catch "";
-  if (pathSlice.len > 0) @memcpy(resourcePaths[2].?[0..pathSlice.len], pathSlice) else resourcePaths[2] = null;
+  if (builtin.os.tag != .emscripten)
+  {
+    pathSlice = fs.selfExeDirPath(&pathBuffer) catch "";
+    if (pathSlice.len > 0)
+      @memcpy(resourcePaths[1].?[0..pathSlice.len], pathSlice)
+    else
+      resourcePaths[1] = null;
+  }
+
+  if (builtin.os.tag != .emscripten)
+  {
+    pathSlice =
+      fs.getAppDataDir(pathAllocator.allocator(), "mission_bitcoin") catch "";
+    if (pathSlice.len > 0)
+      @memcpy(resourcePaths[2].?[0..pathSlice.len], pathSlice)
+    else
+      resourcePaths[2] = null;
+  }
 }
 
 fn openDataDir()

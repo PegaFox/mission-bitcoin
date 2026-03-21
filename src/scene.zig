@@ -10,6 +10,10 @@ const sdl = mainspace.sdl;
 
 pub const ID = enum
 {
+  StartMenu,
+  CreateMenu,
+  JoinMenu,
+  SettingsMenu,
   Game,
   Manual,
   AI,
@@ -17,11 +21,17 @@ pub const ID = enum
 };
 
 pub const scenes = std.EnumArray(ID, Self).init(.{
+  .StartMenu = @import("scenes/start_menu.zig").scene,
+  .CreateMenu = @import("scenes/create_menu.zig").scene,
+  .JoinMenu = @import("scenes/join_menu.zig").scene,
+  .SettingsMenu = @import("scenes/settings_menu.zig").scene,
   .Game = @import("scenes/game.zig").scene,
   .Manual = @import("scenes/manual_player.zig").scene,
   .AI = @import("scenes/ai_player.zig").scene,
   .Remote = @import("scenes/remote_player.zig").scene,
 });
+
+pub var currentScene: *const Self = scenes.getPtrConst(.StartMenu);
 
 keybinds: []struct {
   key: []const u8,

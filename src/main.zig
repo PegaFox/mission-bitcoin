@@ -1,19 +1,20 @@
+const builtin = @import("builtin");
+
 const std = @import("std");
 const log = std.log;
 
 pub const sdl = @cImport({
   @cDefine("SDL_MAIN_HANDLED", {});
-  @cInclude("SDL.h");
-  @cInclude("SDL_main.h");
-  @cInclude("SDL_image.h");
-  @cInclude("SDL_ttf.h");
+  @cInclude("SDL3/SDL.h");
+  @cInclude("SDL3/SDL_main.h");
+  @cInclude("SDL3_image/SDL_image.h");
+  @cInclude("SDL3_ttf/SDL_ttf.h");
 });
 
 pub const stdio = @cImport({
   @cInclude("stdio.h");
 });
 
-const AllocatorType = std.heap.DebugAllocator;
 const Allocator = std.mem.Allocator;
 
 const Scene = @import("scene.zig");
@@ -50,7 +51,18 @@ pub var rand = randomEngine.random();
 pub var running = true;
 var lastFrameTick: i64 = 0;
 
-pub var allocator = AllocatorType(.{}).init;
+var allocator = if (builtin.os.tag == .emscripten)
+  @as(void, undefined)
+  //std.heap.DebugAllocator(.{
+  //  .stack_trace_frames = 0}){
+  //  .backing_allocator = std.heap.wasm_allocator
+  //}
+else
+  std.heap.DebugAllocator(.{}).init;
+pub var gpa = if (builtin.os.tag == .emscripten)
+  std.heap.c_allocator
+else
+  allocator.allocator();
 
 fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl.SDL_AppResult
 {
@@ -63,11 +75,19 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl
 
   log.info("loading default world layout\n", .{});
 
-  if (!sdl.SDL_InitSubSystem(sdl.SDL_INIT_VIDEO))
+  if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO))
   {
     log.err(
-      "SDL failed to initialize video drivers: {s}\n",
-      .{sdl.SDL_GetError()});
+      "SDL failed to initialize video drivers: {s}\n", .{sdl.SDL_GetError()}
+    );
+    return sdl.SDL_APP_FAILURE;
+  }
+
+  if (!sdl.TTF_Init())
+  {
+    log.err(
+      "SDL failed to initialize text library: {s}\n", .{sdl.SDL_GetError()}
+    );
     return sdl.SDL_APP_FAILURE;
   }
 
@@ -99,7 +119,7 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl
 
   for (Scene.scenes.values) |scene|
   {
-    _ = scene.init(allocator.allocator()) catch |e|
+    _ = scene.init(gpa) catch |e|
     {
       log.err("Failed to initialize scene {}\n", .{e});
       return sdl.SDL_APP_FAILURE;
@@ -119,7 +139,7 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
     {
       lastFrameTick = std.time.milliTimestamp();
 
-      Scene.scenes.get(.Game).update() catch |e|
+      Scene.currentScene.update() catch |e|
       {
         log.err("Failed to update scene: {}\n", .{e});
         return sdl.SDL_APP_FAILURE;
@@ -134,7 +154,7 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
         log.err("Failed to clear screen\n", .{});
       }
 
-      Scene.scenes.get(.Game).render() catch |e|
+      Scene.currentScene.render() catch |e|
       {
         log.err("Failed to render scene: {}\n", .{e});
         return sdl.SDL_APP_FAILURE;
@@ -171,7 +191,7 @@ fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event) callconv(.c) sdl.S
     sdl.SDL_GetMouseState(&mPos[0], &mPos[1]);
 
   _ =
-    Scene.scenes.get(.Game).getInput(event.?.*, keys, mPos, mButtons) catch |e|
+    Scene.currentScene.getInput(event.?.*, keys, mPos, mButtons) catch |e|
     {
       log.err("Scene failed to get event: {}\n", .{e});
       return sdl.SDL_APP_FAILURE;
@@ -199,9 +219,12 @@ fn deinit(appstate: ?*anyopaque, result: sdl.SDL_AppResult) callconv(.c) void
 
   sdl.SDL_Quit();
 
-  if (allocator.deinit() == .leak)
+  if (builtin.os.tag != .emscripten)
   {
-    log.warn("Program closed without deallocating all memory\n", .{});
+    if (allocator.deinit() == .leak)
+    {
+      log.warn("Program closed without deallocating all memory\n", .{});
+    }
   }
 }
 
