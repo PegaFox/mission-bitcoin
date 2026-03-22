@@ -7,7 +7,10 @@ const stdio = mainspace.stdio;
 
 var logBuffer = [1024 * 1024]u8{};
 
-pub fn logFn(comptime message_level: log.Level, comptime scope: @TypeOf(.enum_literal), comptime format: []const u8, args: anytype) void
+pub fn logFn(
+  comptime message_level: log.Level,
+  comptime scope: @TypeOf(.enum_literal),
+  comptime format: []const u8, args: anytype) void
 {
   _ = scope;
 

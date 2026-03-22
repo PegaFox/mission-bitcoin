@@ -64,7 +64,8 @@ pub var gpa = if (builtin.os.tag == .emscripten)
 else
   allocator.allocator();
 
-fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl.SDL_AppResult
+fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
+  sdl.SDL_AppResult
 {
   _ = appstate;
   _ = argc;
@@ -188,7 +189,8 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
   return sdl.SDL_APP_CONTINUE;
 }
 
-fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event) callconv(.c) sdl.SDL_AppResult
+fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event)
+  callconv(.c) sdl.SDL_AppResult
 {
   _ = appstate;
 
@@ -260,7 +262,8 @@ pub fn main() u8
 {
   sdl.SDL_SetMainReady();
 
-  const status = sdl.SDL_EnterAppMainCallbacks(0, null, init, update, handleEvent, deinit);
+  const status =
+    sdl.SDL_EnterAppMainCallbacks(0, null, init, update, handleEvent, deinit);
 
   return @bitCast(@as(i8, @truncate(status)));
 }
