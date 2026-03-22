@@ -24,7 +24,9 @@ exchangeTokens: game.TokenType = 0,
 coldStorageTokens: game.TokenType = 0,
 lostTokens: game.TokenType = 0,
 
-pub fn move(self: *Self, parent: []Ring, pos: Pos) void
+/// Target is only required if moving to an orange pill space
+pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
+  error{MissingTarget, InvalidTarget}!void
 {
   self.pos = pos;
 
@@ -62,7 +64,32 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos) void
       }
     },
     .OrangePill => {
-      // TODO: When this space is landed on, the current player should select another player to give one token to
+      if (target) |t|
+      {
+        if (t == self)
+        {
+          return error.InvalidTarget;
+        }
+
+        // TODO: Let player choose which wallet to give from
+        if (self.exchangeTokens > 0)
+        {
+          t.coldStorageTokens += 1;
+          self.exchangeTokens -= 1;
+        } else if (self.coldStorageTokens > 0)
+        {
+          t.coldStorageTokens += 1;
+          self.coldStorageTokens -= 1;
+        } else
+        {
+          game.nextTurn();
+
+          return;
+        }
+      } else
+      {
+        return error.MissingTarget;
+      }
     },
     .Exec6102 => {
       for (game.players.items) |*player|

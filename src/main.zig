@@ -122,6 +122,12 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c) sdl
     _ = scene.init(gpa) catch |e|
     {
       log.err("Failed to initialize scene {}\n", .{e});
+
+      if (@errorReturnTrace()) |trace|
+      {
+        std.debug.dumpStackTrace(trace.*);
+      }
+
       return sdl.SDL_APP_FAILURE;
     };
   }
@@ -142,6 +148,12 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
       Scene.currentScene.update() catch |e|
       {
         log.err("Failed to update scene: {}\n", .{e});
+
+        if (@errorReturnTrace()) |trace|
+        {
+          std.debug.dumpStackTrace(trace.*);
+        }
+
         return sdl.SDL_APP_FAILURE;
       };
 
@@ -157,6 +169,12 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
       Scene.currentScene.render() catch |e|
       {
         log.err("Failed to render scene: {}\n", .{e});
+
+        if (@errorReturnTrace()) |trace|
+        {
+          std.debug.dumpStackTrace(trace.*);
+        }
+
         return sdl.SDL_APP_FAILURE;
       };
 
@@ -194,6 +212,12 @@ fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event) callconv(.c) sdl.S
     Scene.currentScene.getInput(event.?.*, keys, mPos, mButtons) catch |e|
     {
       log.err("Scene failed to get event: {}\n", .{e});
+
+      if (@errorReturnTrace()) |trace|
+      {
+        std.debug.dumpStackTrace(trace.*);
+      }
+
       return sdl.SDL_APP_FAILURE;
     };
 
@@ -211,7 +235,11 @@ fn deinit(appstate: ?*anyopaque, result: sdl.SDL_AppResult) callconv(.c) void
 
   for (Scene.scenes.values) |scene|
   {
-    scene.deinit() catch {};
+    scene.deinit() catch
+      if (@errorReturnTrace()) |trace|
+      {
+        std.debug.dumpStackTrace(trace.*);
+      };
   }
 
   sdl.SDL_DestroyRenderer(renderer);

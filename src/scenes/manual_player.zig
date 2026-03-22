@@ -19,6 +19,13 @@ var gpa: Allocator = undefined;
 
 var selectedTexture: *sdl.SDL_Texture = undefined;
 
+var state: union(enum)
+{
+  MoveInput: void,
+  PillInput: struct {move: Player.Pos},
+  Moving: struct {move: Player.Pos, pillPlayer: ?*Player}
+} = .MoveInput;
+
 pub const scene = Scene{
   .keybinds = &.{},
 
@@ -47,13 +54,53 @@ pub const scene = Scene{
     if (event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
       const selected = hoveredSpace();
-      for (Player.moves) |move|
+
+      switch (state)
       {
-        if (@reduce(.And, move.? == selected.?))
-        {
-          var currentPlayer = &game.players.items[game.currentPlayer].value;
-          currentPlayer.move(game.board.items, move);
-        }
+        .MoveInput => {
+          for (Player.moves) |move|
+          {
+            if (@reduce(.And, move.? == selected.?))
+            {
+              const space = game.board.items[move.?[1]].spaces[move.?[0]];
+
+              log.info("moving to {}: {}\n", .{
+                move.?, space
+              });
+
+              if (space.type == .OrangePill)
+              {
+                state = .{.PillInput = .{.move = move}};
+              } else
+              {
+                state = .{.Moving = .{.move = move, .pillPlayer = null}};
+              }
+            }
+          }
+        },
+        .PillInput => |m| {
+          for (0.., game.players.items) |p, *player|
+          {
+            if (p == game.currentPlayer or player.value.pos == null)
+            {
+              continue;
+            }
+
+            const pos = player.value.pos.?;
+            if (@reduce(.And, pos == selected.?))
+            {
+              log.info("chose player {}\n", .{
+                player
+              });
+
+              state = .{.Moving = .{
+                .move = m.move,
+                .pillPlayer = &player.value
+              }};
+            }
+          }
+        },
+        .Moving => {}
       }
     }
 
@@ -62,19 +109,22 @@ pub const scene = Scene{
 
   .update = struct {fn update() !void
   {
+    switch (state)
+    {
+      .MoveInput => {},
+      .PillInput => {},
+      .Moving => |m| {
+        var currentPlayer = &game.players.items[game.currentPlayer].value;
+        currentPlayer.move(game.board.items, m.move, m.pillPlayer) catch
+          unreachable;
 
+        state = .MoveInput;
+      }
+    }
   }}.update,
   
   .render = struct {fn render() !void
   {
-    var timeOffset: f32 = 
-      @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
-    timeOffset = @sin(timeOffset * 0.002 * std.math.pi);
-
-    const winSize = game.boardRenderArea()[1];
-    //const center = winSize * @as(mainspace.WinCoord, @splat(0.5));
-    const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.002);
-
     const currentPlayer = &game.players.items[game.currentPlayer];
     if (!sdl.SDL_SetTextureColorModFloat(selectedTexture,
       currentPlayer.color[0],
@@ -83,38 +133,27 @@ pub const scene = Scene{
     {
       return error.SDL_RenderFail;
     }
-    for (Player.moves) |move|
+    switch (state)
     {
-      const pos = try game.boardToWindowPos(game.board.items, null, move);
-      
-      if (!sdl.SDL_RenderTexture(
-        mainspace.renderer, selectedTexture, null,
-        &.{
-          .x = pos[0]-radius,
-          .y = pos[1]-radius,
-          .w = radius*2,
-          .h = radius*2,
-        }))
-      {
-        return error.SDL_RenderFail;
-      }
+      .MoveInput => {
+        for (Player.moves) |move|
+        {
+          try renderSelectionCircle(move);
+        }
+      },
+      .PillInput => {
+        for (0.., game.players.items) |p, player|
+        {
+          if (p == game.currentPlayer or player.value.pos == null)
+          {
+            continue;
+          }
+
+          try renderSelectionCircle(player.value.pos);
+        }
+      },
+      .Moving => {}
     }
-
-    //const pos =
-    //  game.boardToWindowPos(game.board.items, null, hoveredSpace()) catch
-    //    return;
-
-    //if (!sdl.SDL_RenderTexture(
-    //  mainspace.renderer, selectedTexture, null,
-    //  &.{
-    //    .x = pos[0] - radius,
-    //    .y = pos[1] - radius,
-    //    .w = radius*2,
-    //    .h = radius*2,
-    //  }))
-    //{
-    //  return error.SDL_RenderFail;
-    //}
   }}.render,
   
   .deinit = struct {fn deinit() !void
@@ -122,6 +161,31 @@ pub const scene = Scene{
 
   }}.deinit,
 };
+
+fn renderSelectionCircle(pos: Player.Pos) error{InvalidPos, SDL_RenderFail}!void
+{
+  var timeOffset: f32 = 
+    @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
+  timeOffset = @sin(timeOffset * 0.002 * std.math.pi);
+
+  const winSize = game.boardRenderArea()[1];
+  //const center = winSize * @as(mainspace.WinCoord, @splat(0.5));
+  const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.002);
+
+  const winPos = try game.boardToWindowPos(game.board.items, null, pos);
+  
+  if (!sdl.SDL_RenderTexture(
+    mainspace.renderer, selectedTexture, null,
+    &.{
+      .x = winPos[0]-radius,
+      .y = winPos[1]-radius,
+      .w = radius*2,
+      .h = radius*2,
+    }))
+  {
+    return error.SDL_RenderFail;
+  }
+}
 
 pub fn hoveredSpace() BoardCoord
 {

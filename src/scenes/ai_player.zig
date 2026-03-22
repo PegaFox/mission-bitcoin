@@ -52,8 +52,13 @@ pub const scene = Scene{
 
     currentPlayer.move(
       game.board.items,
-      Player.moves[mainspace.rand.uintLessThan(u3, @intCast(Player.moves.len))]
-    );
+      Player.moves[mainspace.rand.uintLessThan(u3, @intCast(Player.moves.len))],
+      &game.players.items[@mod(
+        mainspace.rand.uintLessThan(usize, game.players.items.len-1) +
+        game.currentPlayer+1,
+        game.players.items.len
+      )].value
+    ) catch unreachable;
   }}.update,
   
   .render = struct {fn render() !void
