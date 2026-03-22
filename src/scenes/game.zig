@@ -71,7 +71,7 @@ pub const scene = Scene{
       try jsonFromFile(allocator, []struct {
         color: [3]f32,
         entryIndex: u8,
-      }, "assets/metadata/players.json");
+      }, &.{"assets", "metadata", "players.json"});
     defer jsonOut.deinit();
 
     try players.ensureTotalCapacity(allocator, jsonOut.value.len);
@@ -197,44 +197,50 @@ fn loadTextures() !void
 {
   ringTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/ring.svg"));
+    try directoryManager.getPath(&.{"assets", "images", "ring.svg"}));
 
   spaceHasTokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/spaces/token_space.svg"));
+    try directoryManager.getPath(&.{
+      "assets", "images", "spaces", "token_space.svg"
+    }));
   spaceRerollTextures[0] = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/spaces/no_reroll.svg"));
+    try directoryManager.getPath(&.{
+      "assets", "images", "spaces", "no_reroll.svg"
+    }));
   spaceRerollTextures[1] = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/spaces/reroll.svg"));
+    try directoryManager.getPath(&.{
+      "assets", "images", "spaces", "reroll.svg"
+    }));
   inline for (0..spaceTypeTextures.values.len) |t|
   {
     const spaceType: Space.Type = @enumFromInt(t);
 
     const filename = spaceType.toSnakeStr();
-    const path =
-      "assets/images/spaces/" ++ filename[0..filename.len-1] ++ ".svg";
+    const path = filename[0..filename.len-1] ++ ".svg";
     log.debug("Loading \"{s}\"\n", .{path});
 
     spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath(path));
+      try directoryManager.getPath(&.{"assets", "images", "spaces", path}));
   }
 
   tokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/token.svg"));
+    try directoryManager.getPath(&.{"assets", "images", "token.svg"}));
 
   playerTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath("assets/images/player.svg"));
+    try directoryManager.getPath(&.{"assets", "images", "player.svg"}));
 }
 
 fn loadBoard(allocator: Allocator) !void
 {
   const jsonOut =
-    try jsonFromFile(allocator, [][]Space, "assets/metadata/board.json");
+    try jsonFromFile(allocator, [][]Space,
+      &.{"assets", "metadata", "board.json"});
   defer jsonOut.deinit();
 
   const spaceCount = blk:{
@@ -284,7 +290,7 @@ fn loadBoard(allocator: Allocator) !void
 }
 
 // Parsed data must be freed with .deinit()
-fn jsonFromFile(allocator: Allocator, T: type, path: []const u8)
+fn jsonFromFile(allocator: Allocator, T: type, path: []const []const u8)
   !std.json.Parsed(T)
 {
   const boardFilePath =

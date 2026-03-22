@@ -10,22 +10,25 @@ const mainspace = @import("main.zig");
 
 // I use a custom value because freestanding OS has no defined max
 const pathMaxSize = 1024;
+const PathBuffer = [pathMaxSize]u8;
 
-var resourcePaths = [_]?[pathMaxSize]u8{
+var resourcePaths = [_]?PathBuffer{
   null, // cwdPath
   null, // exeDirPath
   null, // dataDirPath
 };
 
-var pathBuffer: [pathMaxSize]u8 = undefined;
+var pathBuffer: PathBuffer = undefined;
 var pathAllocator = std.heap.FixedBufferAllocator.init(&pathBuffer);
 
 /// Returns a slice that is valid until the next call to a function in this file
-pub fn getPath(relativePath: []const u8) ![:0]const u8
+pub fn getPath(relativePath: []const []const u8) ![:0]const u8
 {
   findResourcePaths();
 
   pathAllocator.reset();
+
+  const pathStr = try path.joinZ(pathAllocator.allocator(), relativePath);
 
   for (resourcePaths) |resourcePath|
   {
@@ -34,15 +37,18 @@ pub fn getPath(relativePath: []const u8) ![:0]const u8
       const dirPathLen = std.mem.indexOfSentinel(u8, 0, dirPath[0..dirPath.len-1 :0]);
       log.info("checking dir \"{s}\"\n", .{dirPath[0..dirPathLen]});
       var dir = try fs.openDirAbsolute(dirPath[0..dirPathLen], .{});
-      log.info("checking dir for subdirectory \"{s}\"\n", .{relativePath});
-      dir.access(relativePath, .{}) catch continue;
+      log.info("checking dir for subdirectory \"{s}\"\n", .{pathStr});
+      dir.access(pathStr, .{}) catch continue;
       dir.close();
 
-      const resultPath: [:0]u8 = @ptrCast(try pathAllocator.allocator().alloc(u8, dirPathLen+1+relativePath.len));
-      @memcpy(resultPath[0..dirPathLen], dirPath[0..dirPathLen]);
-      resultPath[dirPathLen] = path.sep;
-      @memcpy(resultPath[dirPathLen+1..dirPathLen+1+relativePath.len], relativePath);
-      resultPath[resultPath.len] = 0;
+      const resultPath = try path.joinZ(
+        pathAllocator.allocator(), &.{dirPath[0..dirPathLen], pathStr}
+      );
+      //const resultPath: [:0]u8 = @ptrCast(try pathAllocator.allocator().alloc(u8, dirPathLen+1+pathStr.len));
+      //@memcpy(resultPath[0..dirPathLen], dirPath[0..dirPathLen]);
+      //resultPath[dirPathLen] = path.sep;
+      //@memcpy(resultPath[dirPathLen+1..dirPathLen+1+pathStr.len], pathStr);
+      //resultPath[resultPath.len] = 0;
 
       return resultPath;
     } else
@@ -55,9 +61,9 @@ pub fn getPath(relativePath: []const u8) ![:0]const u8
   fs.makeDirAbsolute(dataDirPath) catch |e| if (e != std.posix.MakeDirError.PathAlreadyExists) return e;
   var dataDir = try fs.openDirAbsolute(dataDirPath, .{.access_sub_paths = false});
 
-  const relativePathDir = relativePath[0..std.mem.indexOfSentinel(u8, path.sep, @ptrCast(relativePath))];
+  const relativePathDir = pathStr[0..std.mem.indexOfSentinel(u8, path.sep, @ptrCast(relativePath))];
   try dataDir.makePath(relativePathDir);
-  return path.joinZ(pathAllocator.allocator(), &.{dataDirPath, relativePath});
+  return path.joinZ(pathAllocator.allocator(), &.{dataDirPath, pathStr});
 }
 
 fn findResourcePaths() void

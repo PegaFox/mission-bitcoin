@@ -28,7 +28,7 @@ pub const scene = Scene{
 
     selectedTexture = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath("assets/images/selected.svg")
+      try directoryManager.getPath(&.{"assets", "images", "selected.svg"})
     );
 
     return &scene;
