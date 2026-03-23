@@ -1,3 +1,5 @@
+const directoryManager = @import("directory_manager.zig");
+
 const mainspace = @import("main.zig");
 const sdl = mainspace.sdl;
 const WinCoord = mainspace.WinCoord;
@@ -10,29 +12,39 @@ pub const Button = struct
   height: f32,
   texture: *sdl.SDL_Texture,
 
-  pub fn init(
+  pub fn initFromText(
     center: WinCoord,
     height: f32,
     font: *sdl.TTF_Font,
     label: []const u8) Self
   {
-    var result = Self{
-      .center = center,
-      .height = height,
-      .texture = undefined,
-    };
-
     const surface = sdl.TTF_RenderText_Blended(font, label.ptr, label.len, .{
       .r = 0xFF,
       .g = 0xFF,
       .b = 0xFF,
       .a = 0xFF
     });
-    result.texture = sdl.SDL_CreateTextureFromSurface(
-      mainspace.renderer, surface);
-    sdl.SDL_DestroySurface(surface);
+    defer sdl.SDL_DestroySurface(surface);
 
-    return result;
+    return .{
+      .center = center,
+      .height = height,
+      .texture = sdl.SDL_CreateTextureFromSurface(mainspace.renderer, surface),
+    };
+  }
+
+  pub fn initFromTexture(
+    center: WinCoord,
+    height: f32,
+    path: []const []const u8) !Self
+  {
+    return .{
+      .center = center,
+      .height = height,
+      .texture = sdl.IMG_LoadTexture(
+        mainspace.renderer, try directoryManager.getPath(path)
+      ),
+    };
   }
 
   pub fn deinit(self: *Self) void
@@ -75,7 +87,7 @@ pub const Button = struct
     const trueHeight = winSize[1] * self.height;
 
     if (!sdl.SDL_RenderTexture(mainspace.renderer, self.texture, null, &.{
-      .x = (winSize[0]-trueHeight*ratio)*0.5,
+      .x = winSize[0] * (self.center[0]-self.height*ratio*0.5),
       .y = winSize[1] * (self.center[1]-self.height*0.5),
       .w = trueHeight * ratio,
       .h = trueHeight 

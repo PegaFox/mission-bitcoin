@@ -27,7 +27,9 @@ pub const scene = Scene{
     log.info("Initializing start menu\n", .{});
 
     menuFont = sdl.TTF_OpenFont(
-      try directoryManager.getPath(&.{"assets", "fonts", "3270NerdFont-Regular.ttf"}),
+      try directoryManager.getPath(&.{
+        "assets", "fonts", "3270NerdFont-Regular.ttf"
+      }),
       fontQuality
     ) orelse
     {
@@ -35,7 +37,7 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    backButton = .init(.{0.5, 0.8}, 0.1, menuFont, "back");
+    backButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,

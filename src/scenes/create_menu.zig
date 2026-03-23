@@ -38,8 +38,8 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    startButton = .init(.{0.5, 0.2}, 0.1, menuFont, "start");
-    backButton = .init(.{0.5, 0.8}, 0.1, menuFont, "back");
+    startButton = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "start");
+    backButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,

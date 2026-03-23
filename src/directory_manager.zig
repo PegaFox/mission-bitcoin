@@ -34,7 +34,8 @@ pub fn getPath(relativePath: []const []const u8) ![:0]const u8
   {
     if (resourcePath) |dirPath|
     {
-      const dirPathLen = std.mem.indexOfSentinel(u8, 0, dirPath[0..dirPath.len-1 :0]);
+      const dirPathLen =
+        std.mem.indexOfSentinel(u8, 0, dirPath[0..dirPath.len-1 :0]);
       log.info("checking dir \"{s}\"\n", .{dirPath[0..dirPathLen]});
       var dir = try fs.openDirAbsolute(dirPath[0..dirPathLen], .{});
       log.info("checking dir for subdirectory \"{s}\"\n", .{pathStr});
