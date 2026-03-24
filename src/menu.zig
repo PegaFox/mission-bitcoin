@@ -7,6 +7,9 @@ const WinCoord = mainspace.WinCoord;
 pub const Button = struct
 {
   const Self = @This();
+
+  var showHitboxes = false;
+
   // Center and height are relative to the window
   center: WinCoord,
   height: f32,
@@ -18,7 +21,7 @@ pub const Button = struct
     font: *sdl.TTF_Font,
     label: []const u8) Self
   {
-    const surface = sdl.TTF_RenderText_Blended(font, label.ptr, label.len, .{
+    const surface = sdl.TTF_RenderText_Solid(font, label.ptr, label.len, .{
       .r = 0xFF,
       .g = 0xFF,
       .b = 0xFF,
@@ -61,14 +64,16 @@ pub const Button = struct
     const ratio =
       @as(f32, @floatFromInt(self.texture.w)) /
       @as(f32, @floatFromInt(self.texture.h));
+    const trueHeight = winSize[1] * self.height;
+
     const trueCorners = [2]WinCoord{
       .{
-        winSize[0] * (self.center[0] - self.height*ratio*0.5),
-        winSize[1] * (self.center[1] - self.height*0.5)
+        winSize[0]*self.center[0] - trueHeight*ratio*0.5,
+        winSize[1]*self.center[1] - trueHeight*0.5
       },
       .{
-        winSize[0] * (self.center[0] + self.height*ratio*0.5),
-        winSize[1] * (self.center[1] + self.height*0.5)
+        winSize[0]*self.center[0] + trueHeight*ratio*0.5,
+        winSize[1]*self.center[1] + trueHeight*0.5
       },
     };
 
@@ -86,14 +91,24 @@ pub const Button = struct
       @as(f32, @floatFromInt(self.texture.h));
     const trueHeight = winSize[1] * self.height;
 
-    if (!sdl.SDL_RenderTexture(mainspace.renderer, self.texture, null, &.{
-      .x = winSize[0] * (self.center[0]-self.height*ratio*0.5),
-      .y = winSize[1] * (self.center[1]-self.height*0.5),
+    const drawRect = sdl.SDL_FRect{
+      .x = winSize[0]*self.center[0] - trueHeight*ratio*0.5,
+      .y = winSize[1]*self.center[1] - trueHeight*0.5,
       .w = trueHeight * ratio,
       .h = trueHeight 
-    }))
+    };
+
+    if (
+      !sdl.SDL_RenderTexture(mainspace.renderer, self.texture, null, &drawRect))
     {
       return error.SDL_RenderFail;
+    }
+
+    // Hitbox rendering
+    if (showHitboxes)
+    {
+      _ = sdl.SDL_SetRenderDrawColorFloat(mainspace.renderer, 1, 1, 1, 1);
+      _ = sdl.SDL_RenderRect(mainspace.renderer, &drawRect);
     }
   }
 };

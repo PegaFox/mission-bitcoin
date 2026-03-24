@@ -27,3 +27,7 @@
 - Add movement animations
 - Add menus
 - Remove emscripten dependency
+- Add die animation
+- Move opponent wallets to the side
+- Add AI count selector
+- Add ending screen

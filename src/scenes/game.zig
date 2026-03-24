@@ -83,10 +83,7 @@ pub const scene = Scene{
 
       players.append(allocator, .{
         .color = player.color ++ .{1.0},
-        .controller = if (player.color[0] == 0.0)
-            Scene.scenes.getPtrConst(.Manual)
-          else
-            null,//Scene.scenes.getPtrConst(.AI),
+        .controller = null,//Scene.scenes.getPtrConst(.AI),
         .value = .{
           .pos = Player.startingPos,
           .entryIndex = player.entryIndex,
@@ -229,7 +226,7 @@ fn loadTextures() !void
 
   tokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "token.svg"}));
+    try directoryManager.getPath(&.{"assets", "images", "token.png"}));
 
   playerTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,

@@ -38,10 +38,11 @@ pub fn winSize() WinCoord
 
   if (@reduce(.And, size == @as(@TypeOf(size), @splat(0))))
   {
-    if (!sdl.SDL_GetWindowSize(window, &size[0], &size[1]))
+    if (!sdl.SDL_GetWindowSizeInPixels(window, &size[0], &size[1]))
       unreachable;
   }
 
+  //log.info("Get window size: {}\n", .{size});
   return .{@floatFromInt(size[0]), @floatFromInt(size[1])};
 }
 
@@ -198,6 +199,11 @@ fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event)
   {
     return sdl.SDL_APP_SUCCESS;
   }
+
+  //if (event.?.type == sdl.SDL_EVENT_MOUSE_MOTION)
+  //{
+  //  log.debug("Mouse moved to {}\n", .{.{event.?.motion.x, event.?.motion.y}});
+  //}
 
   const keys = kys:{
     var len: c_int = undefined;
