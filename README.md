@@ -27,9 +27,9 @@
 - Add moon (done)
 - Add moon color sections (done)
 - Add menus (done)
+- Add ending screen (done)
 - Switch to GPU API
 - Add AI functionality
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
-- Add ending screen

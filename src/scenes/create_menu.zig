@@ -55,7 +55,7 @@ pub const scene = Scene{
       "assets", "images", "player.svg"
     });
 
-    aiLabel = .initFromText(.{0.5, 0.325}, 0.05, menuFont, "CPU players");
+    aiLabel = .initFromText(.{0.5, 0.325}, 0.05, menuFont, "AI players");
     aiText = .initFromText(.{0.5, 0.4}, 0.1, menuFont, "0");
     try initAiChangeButtons();
 

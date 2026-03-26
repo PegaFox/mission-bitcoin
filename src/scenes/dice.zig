@@ -17,7 +17,7 @@ const BoardCoord = Player.Pos;
 
 var gpa: Allocator = undefined;
 
-pub var rollTime: u32 = 30;
+pub var rollTime: u32 = 60;
 var tick: u32 = 0;
 pub fn reset() void
 {
@@ -70,7 +70,10 @@ pub const scene = Scene{
 
   .update = struct {fn update() !void
   {
-    chosenNumber = mainspace.rand.intRangeAtMost(u3, 1, 6);
+    if (tick % 2 == 0)
+    {
+      chosenNumber = mainspace.rand.intRangeAtMost(u3, 1, 6);
+    }
     tick += 1;
 
     if (tick > rollTime)

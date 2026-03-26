@@ -19,6 +19,8 @@ var menuFont: *sdl.TTF_Font = undefined;
 
 var endingText: menu.Button = undefined;
 var winnerText: ?menu.Button = null;
+var restartButton: menu.Button = undefined;
+var menuButton: menu.Button = undefined;
 
 var gpa: Allocator = undefined;
 
@@ -40,7 +42,9 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    endingText = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "Game Completed!");
+    endingText = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "Game Over!");
+    restartButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "Play again");
+    menuButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "Main menu");
 
     return &scene;
   }}.init,
@@ -97,10 +101,14 @@ pub const scene = Scene{
     {
       try text.render();
     }
+    try restartButton.render();
+    try menuButton.render();
   }}.render,
   
   .deinit = struct {fn deinit() !void
   {
+    menuButton.deinit();
+    restartButton.deinit();
     if (winnerText) |*text|
     {
       text.deinit();
