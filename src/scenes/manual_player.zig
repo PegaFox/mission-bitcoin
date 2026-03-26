@@ -8,6 +8,7 @@ const directoryManager = @import("../directory_manager.zig");
 
 const mainspace = @import("../main.zig");
 const sdl = mainspace.sdl;
+const WinCoord = mainspace.WinCoord;
 
 const game = @import("game.zig");
 
@@ -53,11 +54,11 @@ pub const scene = Scene{
 
     if (event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
-      const selected = hoveredSpace();
-
       switch (state)
       {
         .MoveInput => {
+          const selected = hoveredSpace();
+
           for (Player.moves) |move|
           {
             if (@reduce(.And, move.? == selected.?))
@@ -86,8 +87,12 @@ pub const scene = Scene{
               continue;
             }
 
-            const pos = player.value.pos.?;
-            if (@reduce(.And, pos == selected.?))
+            const walletArea = game.walletRenderArea(p);
+            if (
+              event.button.x > walletArea[0][0] - walletArea[1][1]*0.5 and
+              event.button.y > walletArea[0][1] + walletArea[1][1]*0.25 and
+              event.button.x < walletArea[0][0] and
+              event.button.y < walletArea[0][0] + walletArea[1][1])
             {
               log.info("chose player {}\n", .{
                 player
@@ -138,10 +143,16 @@ pub const scene = Scene{
       .MoveInput => {
         for (Player.moves) |move|
         {
-          try renderSelectionCircle(move);
+          try renderSelectionCircleAtSpace(move);
         }
       },
       .PillInput => {
+        if (!sdl.SDL_SetRenderDrawColorFloat(
+          mainspace.renderer, 1.0, 0.5, 0.0, 1.0))
+        {
+          return error.SDL_RenderFail;
+        }
+
         for (0.., game.players.items) |p, player|
         {
           if (p == game.currentPlayer or player.value.pos == null)
@@ -149,7 +160,11 @@ pub const scene = Scene{
             continue;
           }
 
-          try renderSelectionCircle(player.value.pos);
+          const walletArea = game.walletRenderArea(p);
+          try renderSelectionCircleAtPixel(.{
+            walletArea[0][0] - walletArea[1][1]*0.25,
+            walletArea[0][1] + walletArea[1][1]*0.5
+          });
         }
       },
       .Moving => {}
@@ -162,7 +177,16 @@ pub const scene = Scene{
   }}.deinit,
 };
 
-fn renderSelectionCircle(pos: Player.Pos) error{InvalidPos, SDL_RenderFail}!void
+fn renderSelectionCircleAtSpace(pos: Player.Pos)
+  error{InvalidPos, SDL_RenderFail}!void
+{
+  try renderSelectionCircleAtPixel(
+    try game.boardToWindowPos(game.board.items, null, pos)
+  );
+}
+
+fn renderSelectionCircleAtPixel(pos: WinCoord)
+  error{SDL_RenderFail}!void
 {
   var timeOffset: f32 = 
     @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
@@ -170,15 +194,13 @@ fn renderSelectionCircle(pos: Player.Pos) error{InvalidPos, SDL_RenderFail}!void
 
   const winSize = game.boardRenderArea()[1];
   //const center = winSize * @as(mainspace.WinCoord, @splat(0.5));
-  const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.002);
+  const radius = @min(winSize[0], winSize[1]) * (0.025 + timeOffset*0.004);
 
-  const winPos = try game.boardToWindowPos(game.board.items, null, pos);
-  
   if (!sdl.SDL_RenderTexture(
     mainspace.renderer, selectedTexture, null,
     &.{
-      .x = winPos[0]-radius,
-      .y = winPos[1]-radius,
+      .x = pos[0]-radius,
+      .y = pos[1]-radius,
       .w = radius*2,
       .h = radius*2,
     }))

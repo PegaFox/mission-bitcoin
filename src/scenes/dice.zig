@@ -17,13 +17,14 @@ const BoardCoord = Player.Pos;
 
 var gpa: Allocator = undefined;
 
-pub var rollTime: u32 = 60;
+pub var rollTime: u32 = 0;
 var tick: u32 = 0;
 pub fn reset() void
 {
   tick = 0;
 }
 pub var chosenNumber: u3 = 0;
+const ticksPerChange = 4;
 
 var baseTexture: *sdl.SDL_Texture = undefined;
 var numberTextures: [6]*sdl.SDL_Texture = undefined;
@@ -70,7 +71,7 @@ pub const scene = Scene{
 
   .update = struct {fn update() !void
   {
-    if (tick % 2 == 0)
+    if (tick % ticksPerChange == 0)
     {
       chosenNumber = mainspace.rand.intRangeAtMost(u3, 1, 6);
     }

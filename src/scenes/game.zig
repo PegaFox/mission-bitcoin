@@ -197,9 +197,12 @@ pub const scene = Scene{
     }
 
     // Only show manual player because we don't have single-device multiplayer yet
-    for (0..players.items.len) |p|
+    for (0.., players.items) |p, player|
     {
-      try renderPlayerWallet(board.items, p, walletRenderArea(p));
+      if (player.controller != null)
+      {
+        try renderPlayerWallet(board.items, p, walletRenderArea(p));
+      }
     }
   }}.render,
   
@@ -224,6 +227,29 @@ pub const scene = Scene{
     sdl.SDL_DestroyTexture(playerTexture);
   }}.deinit,
 };
+
+pub fn reset() void
+{
+  for (players.items) |*player|
+  {
+    player.value.pos = Player.startingPos;
+    player.value.exchangeTokens = 0;
+    player.value.coldStorageTokens = 0;
+    player.value.lostTokens = 0;
+  }
+
+  for (board.items) |*ring|
+  {
+    for (ring.spaces) |*space|
+    {
+      if (space.hasToken == false)
+      {
+        space.hasToken = true;
+        ring.tokenCount += 1;
+      }
+    }
+  }
+}
 
 fn loadTextures() !void
 {
@@ -485,17 +511,70 @@ fn renderPlayerWallet(
     renderArea[1][0]*0.2,
     renderArea[1][1]*0.25,
   );
-  
+
+  //const winSize = mainspace.winSize();
+  //
   //noErr &= sdl.SDL_SetRenderDrawColorFloat(
   //  mainspace.renderer,
-  //  player.color[0], player.color[1], player.color[2], player.color[3]);
+  //  player.color[0]/4, player.color[1]/4, player.color[2]/4, player.color[3]);
   //noErr &= sdl.SDL_RenderFillRect(
   //  mainspace.renderer, &.{
   //    .x = renderArea[0][0],
   //    .y = renderArea[0][1],
   //    .w = renderArea[1][0],
   //    .h = renderArea[1][1],
-  //  });
+  //  }
+  //);
+
+  //noErr &= sdl.SDL_SetRenderLogicalPresentation(
+  //  mainspace.renderer,
+  //  @intFromFloat(@ceil(winSize[0]/(renderArea[1][1]*0.025))),
+  //  @intFromFloat(@ceil(winSize[1]/(renderArea[1][1]*0.025))),
+  //  sdl.SDL_LOGICAL_PRESENTATION_STRETCH
+  //);
+  //noErr &= sdl.SDL_SetRenderDrawColorFloat(
+  //  mainspace.renderer,
+  //  player.color[0], player.color[1], player.color[2], player.color[3]);
+  //if (playerIndex == currentPlayer)
+  //{
+  //  noErr &= sdl.SDL_RenderLine(
+  //    mainspace.renderer, 
+  //    @ceil(renderArea[0][0]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][1]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][0]/(renderArea[1][1]*0.025)) + 
+  //    @ceil(renderArea[1][0]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][1]/(renderArea[1][1]*0.025)),
+  //  );
+  //} else
+  //{
+  //  noErr &= sdl.SDL_RenderLine(
+  //    mainspace.renderer, 
+  //    @ceil(renderArea[0][0]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][1]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][0]/(renderArea[1][1]*0.025)),
+  //    @ceil(renderArea[0][1]/(renderArea[1][1]*0.025)) + 
+  //    @ceil(renderArea[1][1]/(renderArea[1][1]*0.025)),
+  //  );
+  //}
+  //noErr &= sdl.SDL_SetRenderLogicalPresentation(
+  //  mainspace.renderer,
+  //  0,
+  //  0,
+  //  sdl.SDL_LOGICAL_PRESENTATION_DISABLED
+  //);
+
+  if (player.controller == Scene.scenes.getPtrConst(.AI))
+  {
+    noErr &= sdl.SDL_SetTextureColorModFloat(
+      playerTexture,
+      player.color[0], player.color[1], player.color[2]);
+    noErr &= sdl.SDL_RenderTexture(mainspace.renderer, playerTexture, null, &.{
+      .x = renderArea[0][0] - renderArea[1][1]*0.5,
+      .y = renderArea[0][1] + renderArea[1][1]*0.25,
+      .w = renderArea[1][1]*0.5,
+      .h = renderArea[1][1]*0.5,
+    });
+  }
 
   noErr &= sdl.SDL_SetRenderDrawColorFloat(
     mainspace.renderer,
@@ -689,7 +768,7 @@ fn boardRenderCenter() WinCoord
   return (winSize[0]+winSize[1]) * @as(WinCoord, @splat(0.5));
 }
 
-fn walletRenderArea(playerIndex: usize) [2]WinCoord
+pub fn walletRenderArea(playerIndex: usize) [2]WinCoord
 {
   const winSize = mainspace.winSize();
 
@@ -705,9 +784,12 @@ fn walletRenderArea(playerIndex: usize) [2]WinCoord
     var aiIndex: usize = 0;
     for (0..playerIndex) |p|
     {
-      if (players.items[p].controller != Scene.scenes.getPtrConst(.Manual))
+      if (players.items[p].controller) |controller|
       {
-        aiIndex += 1;
+        if (controller != Scene.scenes.getPtrConst(.Manual))
+        {
+          aiIndex += 1;
+        }
       }
     }
     return .{

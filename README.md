@@ -33,3 +33,10 @@
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
+- Add epoch arrow sprites
+- Make epoch arrows invisible before ring is clear
+- Add wallet backgrounds
+- Move selector to wallets for orange pill
+- Move players to the side when sharing a space
+- Add wallet size numbers
+- Add player sprites beside wallets

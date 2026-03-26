@@ -55,10 +55,23 @@ pub const scene = Scene{
     mPos: @Vector(2, f32),
     mButtons: sdl.SDL_MouseButtonFlags) !bool
   {
-    _ = event;
     _ = keys;
     _ = mPos;
     _ = mButtons;
+
+    if (event.type == sdl.SDL_EVENT_MOUSE_BUTTON_DOWN)
+    {
+      if (restartButton.contains(.{event.button.x, event.button.y}))
+      {
+        game.reset();
+        Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
+      }
+      if (menuButton.contains(.{event.button.x, event.button.y}))
+      {
+        game.reset();
+        Scene.currentScene = Scene.scenes.getPtrConst(.StartMenu);
+      }
+    }
 
     return true;
   }}.getInput,
