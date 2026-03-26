@@ -9,11 +9,13 @@ const sdl = mainspace.sdl;
 const WinCoord = mainspace.WinCoord;
 
 const directoryManager = @import("../directory_manager.zig");
+const menu = @import("../menu.zig");
 
 const Space = @import("../space.zig");
 const Ring = @import("../ring.zig");
 const Player = @import("../player.zig");
 
+const dice = @import("dice.zig");
 const manual = @import("manual_player.zig");
 
 const BoardCoord = Player.Pos;
@@ -33,6 +35,11 @@ var spaceTypeTextures =
 var tokenTexture: *sdl.SDL_Texture = undefined;
 
 var playerTexture: *sdl.SDL_Texture = undefined;
+
+const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
+var menuFont: *sdl.TTF_Font = undefined;
+var exchangeLabel: menu.Button = undefined;
+var coldStorageLabel: menu.Button = undefined;
 
 var spaces = std.ArrayList(Space).empty;
 pub var board = std.ArrayList(Ring).empty;
@@ -67,6 +74,22 @@ pub const scene = Scene{
 
     try loadTextures();
 
+    menuFont = sdl.TTF_OpenFont(
+      try directoryManager.getPath(&.{
+        "assets", "fonts", "3270NerdFont-Regular.ttf"
+      }),
+      fontQuality
+    ) orelse
+    {
+      log.err("Failed to load font: {s}\n", .{sdl.SDL_GetError()});
+      return error.SDL_LoadFail;
+    };
+
+    exchangeLabel =
+      .initFromText(.{0.45, 0.98}, 0.02, menuFont, "Exchange Wallet");
+    coldStorageLabel =
+      .initFromText(.{0.55, 0.98}, 0.02, menuFont, "Cold Storage");
+
     const jsonOut =
       try jsonFromFile(allocator, []struct {
         color: [3]f32,
@@ -98,9 +121,6 @@ pub const scene = Scene{
 
     currentPlayer =
       mainspace.rand.uintLessThan(u8, @intCast(players.items.len));
-    _ = players.items[currentPlayer].value.getMoves(
-      board.items, mainspace.rand.intRangeAtMost(u8, 1, 6)
-    );
 
     return &scene;
   }}.init,
@@ -128,7 +148,7 @@ pub const scene = Scene{
     {
       nextTurn();
       _ = players.items[currentPlayer].value.getMoves(
-        board.items, mainspace.rand.intRangeAtMost(u8, 1, 6)
+        board.items, dice.chosenNumber
       );
     }
   }}.update,
@@ -138,7 +158,7 @@ pub const scene = Scene{
     try renderSpaces(board.items);
 
     const winSize = boardRenderArea()[1];
-    const size = @min(winSize[0], winSize[1]) * 0.05;
+    const size = @min(winSize[0], winSize[1]) * 0.1;
 
     for (players.items, 0..players.items.len) |player, p|
     {
@@ -169,7 +189,17 @@ pub const scene = Scene{
       try controller.render();
     }
 
-    try renderPlayerWallets(board.items);
+    // Check for main scene to prevent recursion
+    if (Scene.currentScene == Scene.scenes.getPtrConst(.Game))
+    {
+      try Scene.scenes.get(.Dice).render();
+    }
+
+    // Only show manual player because we don't have single-device multiplayer yet
+    for (0..players.items.len) |p|
+    {
+      try renderPlayerWallet(board.items, p, walletRenderArea(p));
+    }
   }}.render,
   
   .deinit = struct {fn deinit() !void
@@ -178,6 +208,10 @@ pub const scene = Scene{
     spaces.deinit(gpa);
 
     players.deinit(gpa);
+
+    coldStorageLabel.deinit();
+    exchangeLabel.deinit();
+    sdl.TTF_CloseFont(menuFont);
 
     sdl.SDL_DestroyTexture(spaceHasTokenTexture);
     sdl.SDL_DestroyTexture(spaceRerollTextures[0]);
@@ -438,93 +472,84 @@ fn renderSpace(space: Space, pos: mainspace.WinCoord, radius: f32)
   }
 }
 
-fn renderPlayerWallets(spaceArr: []Ring) error{SDL_RenderFail, InvalidPos}!void
+fn renderPlayerWallet(
+  spaceArr: []Ring, playerIndex: usize, renderArea: [2]WinCoord)
+  error{SDL_RenderFail, InvalidPos}!void
 {
   var noErr = true;
 
-  const renderArea = walletRenderArea();
-
-  const walletSize: WinCoord = .{
-    renderArea[1][0] / @as(f32, @floatFromInt(players.items.len)),
-    renderArea[1][1]
-  };
+  const player = &players.items[playerIndex];
 
   const tokenRadius: f32 = @min(
-    walletSize[0]*0.2,
-    walletSize[1]*0.3,
-    renderArea[1][0]*0.02,
+    renderArea[1][0]*0.2,
+    renderArea[1][1]*0.25,
+  );
+  
+  //noErr &= sdl.SDL_SetRenderDrawColorFloat(
+  //  mainspace.renderer,
+  //  player.color[0], player.color[1], player.color[2], player.color[3]);
+  //noErr &= sdl.SDL_RenderFillRect(
+  //  mainspace.renderer, &.{
+  //    .x = renderArea[0][0],
+  //    .y = renderArea[0][1],
+  //    .w = renderArea[1][0],
+  //    .h = renderArea[1][1],
+  //  });
+
+  noErr &= sdl.SDL_SetRenderDrawColorFloat(
+    mainspace.renderer,
+    1.0, 0.0, 0.0, 1.0);
+  noErr &= sdl.SDL_RenderRect(
+    mainspace.renderer, &.{
+      .x = renderArea[0][0] + renderArea[1][0]*0.05,
+      .y = renderArea[0][1] + renderArea[1][1]*0.025,
+      .w = renderArea[1][0]*0.4,
+      .h = renderArea[1][1]*0.95,
+    });
+
+  try renderTokenStack(
+    .{
+      renderArea[0][0] + renderArea[1][0]*0.25,
+      renderArea[0][1] + renderArea[1][1]*0.85
+    },
+    tokenRadius,
+    player.value.exchangeTokens
   );
 
-  for (0..players.items.len, players.items) |p, player|
-  {
-    const walletArea: [2]WinCoord = .{
-      .{walletSize[0] * @as(f32, @floatFromInt(p)), renderArea[0][1]},
-      .{walletSize[0], walletSize[1]},
-    };
+  noErr &= sdl.SDL_SetRenderDrawColorFloat(
+    mainspace.renderer,
+    0.0, 0.0, 1.0, 1.0);
+  noErr &= sdl.SDL_RenderRect(
+    mainspace.renderer, &.{
+      .x = renderArea[0][0] + renderArea[1][0]*0.55,
+      .y = renderArea[0][1] + renderArea[1][1]*0.025,
+      .w = renderArea[1][0]*0.4,
+      .h = renderArea[1][1]*0.95,
+    });
 
-    noErr &= sdl.SDL_SetRenderDrawColorFloat(
-      mainspace.renderer,
-      player.color[0], player.color[1], player.color[2], player.color[3]);
-    noErr &= sdl.SDL_RenderFillRect(
-      mainspace.renderer, &.{
-        .x = walletArea[0][0],
-        .y = walletArea[0][1],
-        .w = walletArea[1][0],
-        .h = walletArea[1][1],
-      });
+  try renderTokenStack(
+    .{
+      renderArea[0][0] + renderArea[1][0]*0.75,
+      renderArea[0][1] + renderArea[1][1]*0.85
+    },
+    tokenRadius,
+    player.value.coldStorageTokens
+  );
 
-    noErr &= sdl.SDL_SetRenderDrawColorFloat(
-      mainspace.renderer,
-      1.0, 0.0, 0.0, 1.0);
-    noErr &= sdl.SDL_RenderRect(
-      mainspace.renderer, &.{
-        .x = walletArea[0][0] + walletArea[1][0]*0.05,
-        .y = walletArea[0][1] + walletArea[1][1]*0.025,
-        .w = walletArea[1][0]*0.4,
-        .h = walletArea[1][1]*0.95,
-      });
+  const radius =
+    getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.5;
+  try renderTokenStack(
+    try boardToWindowPos(
+      spaceArr,
+      @intCast(players.items.len-playerIndex-1),
+      Player.endingPos
+    ) + WinCoord{0, radius*0.5},
+    radius,
+    players.items[players.items.len-playerIndex-1].value.lostTokens
+  );
 
-    try renderTokenStack(
-      .{
-        walletArea[0][0] + walletArea[1][0]*0.25,
-        walletArea[0][1] + walletArea[1][1]*0.95
-      },
-      tokenRadius,
-      player.value.exchangeTokens
-    );
-
-    noErr &= sdl.SDL_SetRenderDrawColorFloat(
-      mainspace.renderer,
-      0.0, 0.0, 1.0, 1.0);
-    noErr &= sdl.SDL_RenderRect(
-      mainspace.renderer, &.{
-        .x = walletArea[0][0] + walletArea[1][0]*0.55,
-        .y = walletArea[0][1] + walletArea[1][1]*0.025,
-        .w = walletArea[1][0]*0.4,
-        .h = walletArea[1][1]*0.95,
-      });
-
-    try renderTokenStack(
-      .{
-        walletArea[0][0] + walletArea[1][0]*0.75,
-        walletArea[0][1] + walletArea[1][1]*0.95
-      },
-      tokenRadius,
-      player.value.coldStorageTokens
-    );
-
-    const radius =
-      getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.5;
-    try renderTokenStack(
-      try boardToWindowPos(
-        spaceArr,
-        @intCast(players.items.len-p-1),
-        Player.endingPos
-      ) + WinCoord{0, radius*0.5},
-      radius,
-      players.items[players.items.len-p-1].value.lostTokens
-    );
-  }
+  try exchangeLabel.render();
+  try coldStorageLabel.render();
 
   if (!noErr)
   {
@@ -663,9 +688,30 @@ fn boardRenderCenter() WinCoord
   return (winSize[0]+winSize[1]) * @as(WinCoord, @splat(0.5));
 }
 
-fn walletRenderArea() [2]WinCoord
+fn walletRenderArea(playerIndex: usize) [2]WinCoord
 {
   const winSize = mainspace.winSize();
 
-  return .{.{winSize[0], winSize[1]*0.8}, .{winSize[0], winSize[1]*0.2}};
+  if (
+    players.items[playerIndex].controller == Scene.scenes.getPtrConst(.Manual))
+  {
+    return .{
+      .{winSize[0]*0.4, winSize[1]*0.8},
+      .{winSize[0]*0.2, winSize[1]*0.2}
+    };
+  } else
+  {
+    var aiIndex: usize = 0;
+    for (0..playerIndex) |p|
+    {
+      if (players.items[p].controller != Scene.scenes.getPtrConst(.Manual))
+      {
+        aiIndex += 1;
+      }
+    }
+    return .{
+      .{winSize[0]*0.9, winSize[1]*(@as(f32, @floatFromInt(aiIndex))*0.1)},
+      .{winSize[0]*0.1, winSize[1]*0.1}
+    };
+  }
 }

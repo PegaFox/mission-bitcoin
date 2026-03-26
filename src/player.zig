@@ -3,6 +3,8 @@ const Self = @This();
 const std = @import("std");
 const log = std.log;
 
+const Scene = @import("scene.zig");
+
 const Ring = @import("ring.zig");
 const game = @import("scenes/game.zig");
 
@@ -35,9 +37,7 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
 
   defer {
     log.info("Getting moves for player {}\n", .{game.currentPlayer});
-    _ = game.players.items[game.currentPlayer].value.getMoves(
-      parent, mainspace.rand.intRangeAtMost(u8, 1, 6)
-    );
+    Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
   }
 
   if (pos != null and space.hasToken == true)
@@ -45,7 +45,6 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
     self.exchangeTokens += @intFromBool(ring.removeToken(pos.?[0]));
 
     game.nextTurn();
-
     return;
   }
 
@@ -83,7 +82,6 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
         } else
         {
           game.nextTurn();
-
           return;
         }
       } else

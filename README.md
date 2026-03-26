@@ -31,3 +31,4 @@
 - Move opponent wallets to the side
 - Add AI count selector
 - Add ending screen
+- Add labels to wallets

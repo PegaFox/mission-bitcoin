@@ -87,9 +87,6 @@ pub const scene = Scene{
         {
           log.info("Selected player updated to {}\n", .{p});
 
-          game.players.items[selectedPlayer].controller = null;
-          game.players.items[p].controller = Scene.scenes.getPtrConst(.Manual);
-
           selectedPlayer = p;
         }
       }
@@ -119,7 +116,24 @@ pub const scene = Scene{
 
       if (startButton.contains(.{event.button.x, event.button.y}))
       {
-        Scene.currentScene = Scene.scenes.getPtrConst(.Game);
+        game.players.items[selectedPlayer].controller =
+          Scene.scenes.getPtrConst(.Manual);
+
+        for (0..aiCount) |ai|
+        {
+          const playerOffset: usize = switch (ai)
+          {
+            0 => 2,
+            1 => 1,
+            2 => 3,
+            else => 0
+          };
+          game.players.items[
+            @rem(selectedPlayer+playerOffset, game.players.items.len)
+          ].controller = Scene.scenes.getPtrConst(.AI);
+        }
+
+        Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
       }
       if (backButton.contains(.{event.button.x, event.button.y}))
       {
@@ -142,7 +156,7 @@ pub const scene = Scene{
     {
       playerButton.center[0] = playerButtonPos(p)[0];
                 
-      const selected = player.controller == Scene.scenes.getPtrConst(.Manual);
+      const selected = selectedPlayer == p;
       const colorDivisor =
         @as(f32, @floatFromInt(@intFromBool(!selected)))+1;
       if (!sdl.SDL_SetTextureColorModFloat(playerButton.texture,
