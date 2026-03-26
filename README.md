@@ -19,16 +19,17 @@
 - Add space functionality (done)
 - Render circle around rings (done)
 - Render player wallets (done)
+- Add dice animation (done)
+- Move opponent wallets to the side (done)
+- Add AI count selector (done)
+- Add labels to wallets (done)
+- Add orange pill functionality (done)
+- Add moon (done)
+- Add moon color sections (done)
+- Add menus (done)
 - Switch to GPU API
-- Add orange pill functionality
-- Add moon
 - Add AI functionality
 - Add networking
 - Add movement animations
-- Add menus
 - Remove emscripten dependency
-- Add die animation
-- Move opponent wallets to the side
-- Add AI count selector
 - Add ending screen
-- Add labels to wallets

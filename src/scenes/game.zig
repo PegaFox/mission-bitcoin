@@ -190,7 +190,8 @@ pub const scene = Scene{
     }
 
     // Check for main scene to prevent recursion
-    if (Scene.currentScene == Scene.scenes.getPtrConst(.Game))
+    // Only this may use a non-equality. Putting this on dice as well would stall the program
+    if (Scene.currentScene != Scene.scenes.getPtrConst(.Dice))
     {
       try Scene.scenes.get(.Dice).render();
     }

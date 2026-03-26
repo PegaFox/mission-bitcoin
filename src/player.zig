@@ -26,6 +26,12 @@ exchangeTokens: game.TokenType = 0,
 coldStorageTokens: game.TokenType = 0,
 lostTokens: game.TokenType = 0,
 
+/// Number of tokens in exchange and cold storage wallets
+pub fn totalTokens(self: Self) game.TokenType
+{
+  return self.coldStorageTokens + self.exchangeTokens;
+}
+
 /// Target is only required if moving to an orange pill space
 pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
   error{MissingTarget, InvalidTarget}!void
@@ -37,7 +43,13 @@ pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
 
   defer {
     log.info("Getting moves for player {}\n", .{game.currentPlayer});
-    Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
+    if (space.type == .Moon)
+    {
+      Scene.currentScene = Scene.scenes.getPtrConst(.Ending);
+    } else
+    {
+      Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
+    }
   }
 
   if (pos != null and space.hasToken == true)
