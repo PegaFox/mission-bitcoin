@@ -31,6 +31,7 @@ var spaceHasTokenTexture: *sdl.SDL_Texture = undefined;
 var spaceRerollTextures: [2]*sdl.SDL_Texture = undefined;
 var spaceTypeTextures =
   std.EnumArray(Space.Type, *sdl.SDL_Texture).initUndefined();
+var arrowTexture: *sdl.SDL_Texture = undefined;
 
 var tokenTexture: *sdl.SDL_Texture = undefined;
 
@@ -160,11 +161,44 @@ pub const scene = Scene{
     const winSize = boardRenderArea()[1];
     const size = @min(winSize[0], winSize[1]) * 0.1;
 
-    for (players.items, 0..players.items.len) |player, p|
+    for (0.., players.items) |p, player|
     {
-      const pos =
-        boardToWindowPos(board.items, @intCast(p), player.value.pos) catch
-          unreachable;
+      const pos = blk:{
+        const spacePos =
+          boardToWindowPos(board.items, @intCast(p), player.value.pos) catch
+            unreachable;
+
+        if (player.value.pos == null)
+        {
+          break:blk spacePos;
+        }
+
+        var sharingSpace = false;
+        for (0.., players.items) |colP, collidePlayer|
+        {
+          if (
+            colP != p and collidePlayer.value.pos != null and
+            @reduce(.And, collidePlayer.value.pos.? == player.value.pos.?))
+          {
+            sharingSpace = true;
+            break;
+          }
+        }
+
+        if (sharingSpace)
+        {
+          const offset =
+            (try boardToWindowPos(board.items, @truncate(p), null) -
+            try boardToWindowPos(board.items, null, .{
+              0, @intCast(board.items.len-1)
+            })) * @as(WinCoord, @splat(0.025));
+
+          break:blk spacePos + offset;
+        } else
+        {
+          break:blk spacePos;
+        }
+      };
 
       _ = sdl.SDL_SetTextureColorModFloat(
         playerTexture,
@@ -220,6 +254,7 @@ pub const scene = Scene{
     sdl.SDL_DestroyTexture(spaceHasTokenTexture);
     sdl.SDL_DestroyTexture(spaceRerollTextures[0]);
     sdl.SDL_DestroyTexture(spaceRerollTextures[1]);
+    sdl.SDL_DestroyTexture(arrowTexture);
     for (spaceTypeTextures.values) |texture|
     {
       sdl.SDL_DestroyTexture(texture);
@@ -284,6 +319,9 @@ fn loadTextures() !void
       mainspace.renderer,
       try directoryManager.getPath(&.{"assets", "images", "spaces", path}));
   }
+  arrowTexture = sdl.IMG_LoadTexture(
+    mainspace.renderer,
+    try directoryManager.getPath(&.{"assets", "images", "epoch_arrow.svg"}));
 
   tokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
@@ -403,8 +441,9 @@ fn renderSpaces(spaceArr: []Ring) error{SDL_RenderFail, InvalidPos}!void
         pos[0], pos[1],
         nextPos[0], nextPos[1]);
 
-      if (space.jumpIndex) |i|
+      if (ring.tokenCount == 0 and space.jumpIndex != null)
       {
+        const i = space.jumpIndex.?;
         const linkPos =
           try boardToWindowPos(spaceArr, null, .{i, @intCast(y+1)});
 
@@ -412,6 +451,30 @@ fn renderSpaces(spaceArr: []Ring) error{SDL_RenderFail, InvalidPos}!void
           mainspace.renderer,
           1.0, 0.5, 0.0, 1.0);
 
+        const arrowDir = blk:{
+          const arrowVec = WinCoord{linkPos[0]-pos[0], linkPos[1]-pos[1]};
+          const len = @sqrt(arrowVec[0]*arrowVec[0] + arrowVec[1]*arrowVec[1]);
+
+          break:blk arrowVec / @as(WinCoord, @splat(len));
+        };
+        const normDir = WinCoord{-arrowDir[1], arrowDir[0]};
+        noErr &= sdl.SDL_RenderTextureAffine(
+          mainspace.renderer, arrowTexture, null, &.{
+            .x = pos[0]-normDir[0]*25,
+            .y = pos[1]-normDir[1]*25
+          }, &.{
+            .x =
+              linkPos[0] -
+              arrowDir[0]*getSpaceRadius(spaceArr, .{i, @intCast(y+1)}) -
+              normDir[0]*25,
+            .y =
+              linkPos[1] -
+              arrowDir[1]*getSpaceRadius(spaceArr, .{i, @intCast(y+1)}) -
+              normDir[1]*25
+          }, &.{
+            .x = pos[0]+normDir[0]*25,
+            .y = pos[1]+normDir[1]*25
+          });
         noErr &= sdl.SDL_RenderLine(
           mainspace.renderer,
           pos[0], pos[1],

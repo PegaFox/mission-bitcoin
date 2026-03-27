@@ -17,7 +17,7 @@ const BoardCoord = Player.Pos;
 
 var gpa: Allocator = undefined;
 
-pub var rollTime: u32 = 0;
+pub var rollTime: u32 = 60;
 var tick: u32 = 0;
 pub fn reset() void
 {

@@ -28,15 +28,15 @@
 - Add moon color sections (done)
 - Add menus (done)
 - Add ending screen (done)
+- Add player sprites beside wallets (done)
+- Move players to the side when sharing a space (done)
+- Move selector to wallets for orange pill (done)
+- Add epoch arrow sprites (done)
+- Make epoch arrows invisible before ring is clear (done)
 - Switch to GPU API
 - Add AI functionality
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
-- Add epoch arrow sprites
-- Make epoch arrows invisible before ring is clear
-- Add wallet backgrounds
-- Move selector to wallets for orange pill
-- Move players to the side when sharing a space
 - Add wallet size numbers
-- Add player sprites beside wallets
+- Add wallet backgrounds (undone)
