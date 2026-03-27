@@ -39,4 +39,6 @@
 - Add movement animations
 - Remove emscripten dependency
 - Add wallet size numbers
+- Add 'How to Play' section
+- Add guided playthrough
 - Add wallet backgrounds (undone)

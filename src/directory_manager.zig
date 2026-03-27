@@ -9,7 +9,7 @@ const Dir = fs.Dir;
 const mainspace = @import("main.zig");
 
 // I use a custom value because freestanding OS has no defined max
-const pathMaxSize = 1024;
+const pathMaxSize = fs.max_path_bytes;
 const PathBuffer = [pathMaxSize]u8;
 
 var resourcePaths = [_]?PathBuffer{
@@ -58,7 +58,7 @@ pub fn getPath(relativePath: []const []const u8) ![:0]const u8
     }
   }
 
-  const dataDirPath = if (resourcePaths[2]) |dataPath| dataPath[0..std.mem.indexOfSentinel(u8, 0, dataPath[0..dataPath.len-1 :0])] else (&fs.path.sep)[0..1];
+  const dataDirPath = if (resourcePaths[2]) |dataPath| dataPath[0..std.mem.indexOfSentinel(u8, 0, dataPath[0..dataPath.len-1 :0])] else path.sep_str;
   fs.makeDirAbsolute(dataDirPath) catch |e| if (e != std.posix.MakeDirError.PathAlreadyExists) return e;
   var dataDir = try fs.openDirAbsolute(dataDirPath, .{.access_sub_paths = false});
 

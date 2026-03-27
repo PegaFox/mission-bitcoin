@@ -96,10 +96,10 @@ pub const scene = Scene{
         menu.Button.initFromText(
           .{0.5, 0.4}, 0.1, menuFont,
           switch (winner) {
-            0 => "Player red wins!",
-            1 => "Player green wins!",
-            2 => "Player blue wins!",
-            3 => "Player yellow wins!",
+            0 => "Red wins!",
+            1 => "Green wins!",
+            2 => "Blue wins!",
+            3 => "Yellow wins!",
             else => "Hacker wins!",
           });
     }

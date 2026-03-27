@@ -15,6 +15,12 @@ const directoryManager = @import("../directory_manager.zig");
 const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
 
+const creditText = [_][]const u8{
+  "Lexington Fun Games - Original game",
+  "PegaFox - Programming, Spritework",
+};
+var creditButtons: [creditText.len]menu.Button = undefined;
+
 var backButton: menu.Button = undefined;
 
 pub const scene = Scene{
@@ -36,6 +42,13 @@ pub const scene = Scene{
       log.err("Failed to load font: {s}\n", .{sdl.SDL_GetError()});
       return error.SDL_LoadFail;
     };
+
+    for (0..creditButtons.len) |b|
+    {
+      creditButtons[b] = .initFromText(
+        .{0.5, 0.05+@as(f32, @floatFromInt(b))*0.05}, 0.05, menuFont, creditText[b]
+      );
+    }
 
     backButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "back");
 
@@ -72,12 +85,22 @@ pub const scene = Scene{
   
   .render = struct {fn render() !void
   {
+    for (0..creditButtons.len) |b|
+    {
+      try creditButtons[b].render();
+    }
+
     try backButton.render();
   }}.render,
   
   .deinit = struct {fn deinit() !void
   {
     backButton.deinit();
+
+    for (0..creditButtons.len) |b|
+    {
+      creditButtons[b].deinit();
+    }
 
     sdl.TTF_CloseFont(menuFont);
   }}.deinit,
