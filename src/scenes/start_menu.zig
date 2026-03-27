@@ -17,7 +17,7 @@ var menuFont: *sdl.TTF_Font = undefined;
 
 var startButton: menu.Button = undefined;
 var joinButton: menu.Button = undefined;
-var settingsButton: menu.Button = undefined;
+var creditsButton: menu.Button = undefined;
 var quitButton: menu.Button = undefined;
 
 pub const scene = Scene{
@@ -42,7 +42,11 @@ pub const scene = Scene{
 
     startButton = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "start");
     joinButton = .initFromText(.{0.5, 0.4}, 0.1, menuFont, "join");
-    settingsButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "settings");
+    if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, 0.25, 0.25, 0.25))
+    {
+      return error.SDL_RenderFail;
+    }
+    creditsButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "credits");
     quitButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "quit");
 
     return &scene;
@@ -68,10 +72,10 @@ pub const scene = Scene{
         //Scene.currentScene = Scene.scenes.getPtrConst(.Game);
       } else if (joinButton.contains(.{event.button.x, event.button.y}))
       {
-        Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
-      } else if (settingsButton.contains(.{event.button.x, event.button.y}))
+        //Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
+      } else if (creditsButton.contains(.{event.button.x, event.button.y}))
       {
-        Scene.currentScene = Scene.scenes.getPtrConst(.SettingsMenu);
+        Scene.currentScene = Scene.scenes.getPtrConst(.Credits);
       } else if (quitButton.contains(.{event.button.x, event.button.y}))
       {
         var quitEvent: sdl.SDL_Event = .{.quit = .{
@@ -97,14 +101,14 @@ pub const scene = Scene{
   {
     try startButton.render();
     try joinButton.render();
-    try settingsButton.render();
+    try creditsButton.render();
     try quitButton.render();
   }}.render,
   
   .deinit = struct {fn deinit() !void
   {
     quitButton.deinit();
-    settingsButton.deinit();
+    creditsButton.deinit();
     joinButton.deinit();
     startButton.deinit();
 
