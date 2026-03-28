@@ -41,4 +41,5 @@
 - Remove emscripten dependency
 - Add 'How to Play' section
 - Add guided playthrough
+- Add quick reference
 - Add wallet backgrounds (undone)

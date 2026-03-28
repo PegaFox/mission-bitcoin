@@ -11,6 +11,7 @@ const sdl = mainspace.sdl;
 
 const game = @import("game.zig");
 
+const Ring = @import("../ring.zig");
 const Player = @import("../player.zig");
 
 const BoardCoord = Player.Pos;
@@ -48,7 +49,16 @@ pub const scene = Scene{
       return;
     }
 
-    moveRandom();
+    var best = struct {move: BoardCoord, score: i16}{.move = null, .score = 0};
+    for (Player.moves) |move|
+    {
+      const score = spaceValue(game.board.items, move);
+
+      if (best.move == null or score > best.score)
+      {
+        best = .{.move = move, .score = score};
+      }
+    }
   }}.update,
   
   .render = struct {fn render() !void
@@ -85,4 +95,55 @@ fn moveRandom() void
     Player.moves[mainspace.rand.uintLessThan(u3, @intCast(Player.moves.len))],
     &game.players.items[otherPlayer].value
   ) catch unreachable;
+}
+
+/// No reason to take enemy positions into account, players can move too much in one turn for that to work
+/// Avoid orange pills and spaces halfway between orange pills
+/// Prefer cold storage, scaling with number of exchange tokens
+/// Use exchange hack if exchange is empty or low relative to enemy exchange accounts
+/// Avoid token spaces of exchange account is too full
+/// Prefer proximity to exit space if ring tokens are low
+/// Avoid 6102 unless exchange/lost tokens are low
+/// Prefer reroll spaces if nothing else is particularly attractive
+
+fn spaceValue(board: []Ring, pos: BoardCoord) i16
+{
+  if (pos == null)
+  {
+    return std.math.minInt(i16);
+  }
+
+  const currentPlayer = &game.players.items[game.currentPlayer].value;
+
+  const ring = &board[pos.?[1]];
+  const space = &ring.spaces[pos.?[0]];
+
+  var score: i16 = 0;
+
+  if (space.hasToken == true)
+  {
+    if (currentPlayer.exchangeTokens < 3)
+    {
+      score += 10;
+    }
+  } else
+  {
+    score += switch (space.type)
+    {
+      .Default => 0,
+      .ColdStorage => 0,
+      .ExchangeHack => 0,
+      .OrangePill => 0,
+      .Exec6102 => 0,
+      .Moon => 2140,
+    };
+  }
+
+  // Prefer spaces closer to the next epoch
+  if (currentPlayer.pos != null and ring.tokenCount < 6)
+  {
+    score += @min(0, 5 - ring.distance(currentPlayer.pos.?[0], pos.?[0]));
+  }
+
+  return score;
 }

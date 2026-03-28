@@ -86,10 +86,11 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    exchangeLabel =
-      .initFromText(.{0.45, 0.98}, 0.02, menuFont, "Exchange Wallet");
+    exchangeLabel = .initFromText(
+      .{0.5, 0.5}, .{0.45, 0.98}, 0.02, menuFont, "Exchange Wallet"
+    );
     coldStorageLabel =
-      .initFromText(.{0.55, 0.98}, 0.02, menuFont, "Cold Storage");
+      .initFromText(.{0.5, 0.5}, .{0.55, 0.98}, 0.02, menuFont, "Cold Storage");
 
     const jsonOut =
       try jsonFromFile(allocator, []struct {
@@ -722,6 +723,7 @@ fn renderTokenStack(pos: WinCoord, radius: f32, count: TokenType)
 
   const winSize = mainspace.winSize();
   var countLabel = menu.Button.initFromText(
+    .{0.5, 0.5}, 
     WinCoord{
       pos[0],
       pos[1] - totalTokens*radius*0.1

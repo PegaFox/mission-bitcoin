@@ -49,18 +49,21 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    playerLabel =
-      .initFromText(.{0.5, 0.075}, 0.05, menuFont, "choose a color");
-    playerButton = try .initFromTexture(.{0.0, 0.2}, 0.15, &.{
+    playerLabel = .initFromText(
+      .{0.5, 0.5}, .{0.5, 0.075}, 0.05, menuFont, "choose a color"
+    );
+    playerButton = try .initFromTexture(.{0.5, 0.5}, .{0.0, 0.2}, 0.15, &.{
       "assets", "images", "player.svg"
     });
 
-    aiLabel = .initFromText(.{0.5, 0.325}, 0.05, menuFont, "AI players");
-    aiText = .initFromText(.{0.5, 0.4}, 0.1, menuFont, "0");
+    aiLabel =
+      .initFromText(.{0.5, 0.5}, .{0.5, 0.325}, 0.05, menuFont, "AI players");
+    aiText = .initFromText(.{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont, "0");
     try initAiChangeButtons();
 
-    startButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "start");
-    backButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "back");
+    startButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "start");
+    backButton = .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,
@@ -81,7 +84,7 @@ pub const scene = Scene{
     {
       for (0..game.players.items.len) |p|
       {
-        playerButton.center[0] = playerButtonPos(p)[0];
+        playerButton.pos[0] = playerButtonPos(p)[0];
 
         if (playerButton.contains(.{event.button.x, event.button.y}))
         {
@@ -99,7 +102,7 @@ pub const scene = Scene{
         aiText.deinit();
         var printBuffer: [32]u8 = undefined;
         aiText = .initFromText(
-          .{0.5, 0.4}, 0.1, menuFont,
+          .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           try std.fmt.bufPrint(&printBuffer, "{}", .{aiCount}));
       }
       if (
@@ -110,7 +113,7 @@ pub const scene = Scene{
         aiText.deinit();
         var printBuffer: [32]u8 = undefined;
         aiText = .initFromText(
-          .{0.5, 0.4}, 0.1, menuFont,
+          .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           try std.fmt.bufPrint(&printBuffer, "{}", .{aiCount}));
       }
 
@@ -154,7 +157,7 @@ pub const scene = Scene{
     try playerLabel.render();
     for (0.., game.players.items) |p, player|
     {
-      playerButton.center[0] = playerButtonPos(p)[0];
+      playerButton.pos[0] = playerButtonPos(p)[0];
                 
       const selected = selectedPlayer == p;
       const colorDivisor =
@@ -201,7 +204,7 @@ fn playerButtonPos(index: usize) WinCoord
 
   return .{
     playerOffset*0.5 + playerOffset*@as(f32, @floatFromInt(index)),
-    playerButton.center[1]
+    playerButton.pos[1]
   };
 }
 
@@ -236,7 +239,8 @@ fn initAiChangeButtons() error{SDL_RenderFail}!void
   noErr &= sdl.SDL_RenderPresent(surfaceRenderer);
 
   addAi = .{
-    .center = .{0.7, 0.4},
+    .origin = .{0.5, 0.5},
+    .pos = .{0.7, 0.4},
     .height = 0.1,
     .texture = 
       sdl.SDL_CreateTextureFromSurface(mainspace.renderer, renderSurface),
@@ -245,7 +249,8 @@ fn initAiChangeButtons() error{SDL_RenderFail}!void
   noErr &= sdl.SDL_FlipSurface(renderSurface, sdl.SDL_FLIP_HORIZONTAL);
 
   subAi = .{
-    .center = .{0.3, 0.4},
+    .origin = .{0.5, 0.5},
+    .pos = .{0.3, 0.4},
     .height = 0.1,
     .texture = 
       sdl.SDL_CreateTextureFromSurface(mainspace.renderer, renderSurface),

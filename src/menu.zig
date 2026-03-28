@@ -10,13 +10,15 @@ pub const Button = struct
 
   var showHitboxes = false;
 
-  // Center and height are relative to the window
-  center: WinCoord,
+  // Pos and height are relative to the window
+  origin: WinCoord,
+  pos: WinCoord,
   height: f32,
   texture: *sdl.SDL_Texture,
 
   pub fn initFromText(
-    center: WinCoord,
+    origin: WinCoord,
+    pos: WinCoord,
     height: f32,
     font: *sdl.TTF_Font,
     label: []const u8) Self
@@ -30,19 +32,22 @@ pub const Button = struct
     defer sdl.SDL_DestroySurface(surface);
 
     return .{
-      .center = center,
+      .origin = origin,
+      .pos = pos,
       .height = height,
       .texture = sdl.SDL_CreateTextureFromSurface(mainspace.renderer, surface),
     };
   }
 
   pub fn initFromTexture(
-    center: WinCoord,
+    origin: WinCoord,
+    pos: WinCoord,
     height: f32,
     path: []const []const u8) !Self
   {
     return .{
-      .center = center,
+      .origin = origin,
+      .pos = pos,
       .height = height,
       .texture = sdl.IMG_LoadTexture(
         mainspace.renderer, try directoryManager.getPath(path)
@@ -68,12 +73,12 @@ pub const Button = struct
 
     const trueCorners = [2]WinCoord{
       .{
-        winSize[0]*self.center[0] - trueHeight*ratio*0.5,
-        winSize[1]*self.center[1] - trueHeight*0.5
+        winSize[0]*self.pos[0] - trueHeight*ratio*self.origin[0],
+        winSize[1]*self.pos[1] - trueHeight*self.origin[1]
       },
       .{
-        winSize[0]*self.center[0] + trueHeight*ratio*0.5,
-        winSize[1]*self.center[1] + trueHeight*0.5
+        winSize[0]*self.pos[0] + trueHeight*ratio*self.origin[0],
+        winSize[1]*self.pos[1] + trueHeight*self.origin[1]
       },
     };
 
@@ -92,8 +97,8 @@ pub const Button = struct
     const trueHeight = winSize[1] * self.height;
 
     const drawRect = sdl.SDL_FRect{
-      .x = winSize[0]*self.center[0] - trueHeight*ratio*0.5,
-      .y = winSize[1]*self.center[1] - trueHeight*0.5,
+      .x = winSize[0]*self.pos[0] - trueHeight*ratio*self.origin[0],
+      .y = winSize[1]*self.pos[1] - trueHeight*self.origin[1],
       .w = trueHeight * ratio,
       .h = trueHeight 
     };

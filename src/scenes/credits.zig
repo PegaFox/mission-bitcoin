@@ -46,11 +46,15 @@ pub const scene = Scene{
     for (0..creditButtons.len) |b|
     {
       creditButtons[b] = .initFromText(
-        .{0.5, 0.05+@as(f32, @floatFromInt(b))*0.05}, 0.05, menuFont, creditText[b]
+        .{0.0, 0.5},
+        .{0.5, 0.05+@as(f32, @floatFromInt(b))*0.05},
+        0.05,
+        menuFont,
+        creditText[b]
       );
     }
 
-    backButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "back");
+    backButton = .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,

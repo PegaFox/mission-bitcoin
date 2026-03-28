@@ -42,9 +42,12 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    endingText = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "Game Over!");
-    restartButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "Play again");
-    menuButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "Main menu");
+    endingText =
+      .initFromText(.{0.5, 0.5}, .{0.5, 0.2}, 0.1, menuFont, "Game Over!");
+    restartButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "Play again");
+    menuButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "Main menu");
 
     return &scene;
   }}.init,
@@ -94,7 +97,7 @@ pub const scene = Scene{
       };
       winnerText =
         menu.Button.initFromText(
-          .{0.5, 0.4}, 0.1, menuFont,
+          .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           switch (winner) {
             0 => "Red wins!",
             1 => "Green wins!",

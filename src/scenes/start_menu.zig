@@ -17,6 +17,7 @@ var menuFont: *sdl.TTF_Font = undefined;
 
 var startButton: menu.Button = undefined;
 var joinButton: menu.Button = undefined;
+var guideButton: menu.Button = undefined;
 var creditsButton: menu.Button = undefined;
 var quitButton: menu.Button = undefined;
 
@@ -40,14 +41,20 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    startButton = .initFromText(.{0.5, 0.2}, 0.1, menuFont, "start");
-    joinButton = .initFromText(.{0.5, 0.4}, 0.1, menuFont, "join");
+    startButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, menuFont, "start");
+    joinButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "join");
     if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, 0.25, 0.25, 0.25))
     {
       return error.SDL_RenderFail;
     }
-    creditsButton = .initFromText(.{0.5, 0.6}, 0.1, menuFont, "credits");
-    quitButton = .initFromText(.{0.5, 0.8}, 0.1, menuFont, "quit");
+    guideButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 3.0/6.0}, 0.1, menuFont, "how to play");
+    creditsButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 4.0/6.0}, 0.1, menuFont, "credits");
+    quitButton =
+      .initFromText(.{0.5, 0.5}, .{0.5, 5.0/6.0}, 0.1, menuFont, "quit");
 
     return &scene;
   }}.init,
@@ -73,6 +80,9 @@ pub const scene = Scene{
       } else if (joinButton.contains(.{event.button.x, event.button.y}))
       {
         //Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
+      } else if (guideButton.contains(.{event.button.x, event.button.y}))
+      {
+        Scene.currentScene = Scene.scenes.getPtrConst(.Guide);
       } else if (creditsButton.contains(.{event.button.x, event.button.y}))
       {
         Scene.currentScene = Scene.scenes.getPtrConst(.Credits);
@@ -101,6 +111,7 @@ pub const scene = Scene{
   {
     try startButton.render();
     try joinButton.render();
+    try guideButton.render();
     try creditsButton.render();
     try quitButton.render();
   }}.render,
@@ -109,6 +120,7 @@ pub const scene = Scene{
   {
     quitButton.deinit();
     creditsButton.deinit();
+    guideButton.deinit();
     joinButton.deinit();
     startButton.deinit();
 
