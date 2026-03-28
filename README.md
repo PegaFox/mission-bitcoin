@@ -33,12 +33,12 @@
 - Move selector to wallets for orange pill (done)
 - Add epoch arrow sprites (done)
 - Make epoch arrows invisible before ring is clear (done)
+- Add wallet size numbers (done)
 - Switch to GPU API
 - Add AI functionality
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
-- Add wallet size numbers
 - Add 'How to Play' section
 - Add guided playthrough
 - Add wallet backgrounds (undone)

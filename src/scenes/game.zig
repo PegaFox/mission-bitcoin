@@ -719,6 +719,21 @@ fn renderTokenStack(pos: WinCoord, radius: f32, count: TokenType)
       return error.SDL_RenderFail;
     }
   }
+
+  const winSize = mainspace.winSize();
+  var countLabel = menu.Button.initFromText(
+    WinCoord{
+      pos[0],
+      pos[1] - totalTokens*radius*0.1
+    } / winSize,
+    0.02,
+    menuFont,
+    &std.fmt.digits2(count)
+  );
+
+  try countLabel.render();
+
+  countLabel.deinit();
 }
 
 pub fn boardToWindowPos(spaceArr: []Ring, playerIndex: ?u8, pos: BoardCoord)
