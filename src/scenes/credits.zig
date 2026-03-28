@@ -46,7 +46,7 @@ pub const scene = Scene{
     for (0..creditButtons.len) |b|
     {
       creditButtons[b] = .initFromText(
-        .{0.0, 0.5},
+        .{0.5, 0.5},
         .{0.5, 0.05+@as(f32, @floatFromInt(b))*0.05},
         0.05,
         menuFont,
