@@ -15,6 +15,7 @@ const directoryManager = @import("../directory_manager.zig");
 const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
 
+var logoButton: menu.Button = undefined;
 var startButton: menu.Button = undefined;
 var joinButton: menu.Button = undefined;
 var guideButton: menu.Button = undefined;
@@ -41,8 +42,12 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
+    logoButton = try .initFromTexture(
+      .{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, &.{"assets", "images", "logo.png"}
+    );
+    
     startButton =
-      try .initFromText(.{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, menuFont, "start");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "start");
     joinButton =
       try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "join");
     if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, 0.25, 0.25, 0.25))
@@ -110,8 +115,9 @@ pub const scene = Scene{
   
   .render = struct {fn render() !void
   {
+    try logoButton.render();
     try startButton.render();
-    try joinButton.render();
+    //try joinButton.render();
     try guideButton.render();
     try creditsButton.render();
     try quitButton.render();
@@ -124,6 +130,7 @@ pub const scene = Scene{
     guideButton.deinit();
     joinButton.deinit();
     startButton.deinit();
+    logoButton.deinit();
 
     sdl.TTF_CloseFont(menuFont);
   }}.deinit,
