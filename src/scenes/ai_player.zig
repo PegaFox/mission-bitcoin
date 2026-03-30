@@ -59,6 +59,10 @@ pub const scene = Scene{
         best = .{.move = move, .score = score};
       }
     }
+
+    try game.players.items[game.currentPlayer].value.move(
+      game.board.items, best.move, givePill()
+    );
   }}.update,
   
   .render = struct {fn render() !void
@@ -142,8 +146,32 @@ fn spaceValue(board: []Ring, pos: BoardCoord) i16
   // Prefer spaces closer to the next epoch
   if (currentPlayer.pos != null and ring.tokenCount < 6)
   {
-    score += @min(0, 5 - ring.distance(currentPlayer.pos.?[0], pos.?[0]));
+    score += @max(0, 5 - @as(i9, @intCast(
+      ring.distance(currentPlayer.pos.?[0], pos.?[0])
+    )));
   }
 
   return score;
+}
+
+/// Give coin to poorest player, taking in to account lost coins
+fn givePill() ?*Player
+{
+  var poorest: ?*Player = null;
+  for (game.players.items) |*player|
+  {
+    if (
+      player == &game.players.items[game.currentPlayer] or
+      player.controller == null)
+    {
+      continue;
+    }
+
+    if (poorest == null or player.value.allTokens() < poorest.?.allTokens())
+    {
+      poorest = &player.value;
+    }
+  }
+
+  return poorest;
 }

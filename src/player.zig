@@ -27,9 +27,15 @@ coldStorageTokens: game.TokenType = 0,
 lostTokens: game.TokenType = 0,
 
 /// Number of tokens in exchange and cold storage wallets
-pub fn totalTokens(self: Self) game.TokenType
+pub fn ownedTokens(self: Self) game.TokenType
 {
   return self.coldStorageTokens + self.exchangeTokens;
+}
+
+/// Number of tokens in exchange wallet, cold storage, and lost coins
+pub fn allTokens(self: Self) game.TokenType
+{
+  return self.coldStorageTokens + self.exchangeTokens + self.lostTokens;
 }
 
 /// Target is only required if moving to an orange pill space

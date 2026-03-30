@@ -95,8 +95,8 @@ pub const scene = Scene{
         var best: usize = 0;
         for (0.., game.players.items) |p, player| {
           if (
-            game.players.items[best].value.totalTokens() <
-            player.value.totalTokens())
+            game.players.items[best].value.ownedTokens() <
+            player.value.ownedTokens())
           {
             best = p;
           }
@@ -125,6 +125,7 @@ pub const scene = Scene{
     try Scene.scenes.get(.Game).render();
 
     if (
+      winner != null and 
       game.players.items[winner.?].controller ==
       Scene.scenes.getPtrConst(.Manual))
     {
