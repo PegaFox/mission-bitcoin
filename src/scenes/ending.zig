@@ -68,11 +68,17 @@ pub const scene = Scene{
     {
       if (restartButton.contains(.{event.button.x, event.button.y}))
       {
+        winnerText.?.deinit();
+        winnerText = null;
+
         game.reset();
         Scene.currentScene = Scene.scenes.getPtrConst(.Dice);
       }
       if (menuButton.contains(.{event.button.x, event.button.y}))
       {
+        winnerText.?.deinit();
+        winnerText = null;
+
         game.reset();
         Scene.currentScene = Scene.scenes.getPtrConst(.StartMenu);
       }
