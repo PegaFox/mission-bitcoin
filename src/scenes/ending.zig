@@ -17,6 +17,8 @@ const Player = @import("../player.zig");
 const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
 
+var winner: ?usize = null;
+
 var endingText: menu.Button = undefined;
 var winnerText: ?menu.Button = null;
 var restartButton: menu.Button = undefined;
@@ -83,7 +85,7 @@ pub const scene = Scene{
   {
     if (winnerText == null)
     {
-      const winner = blk:{
+      winner = blk:{
         var best: usize = 0;
         for (0.., game.players.items) |p, player| {
           if (
@@ -98,13 +100,17 @@ pub const scene = Scene{
       winnerText =
         try menu.Button.initFromText(
           .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
-          switch (winner) {
-            0 => "Red wins!",
-            1 => "Green wins!",
-            2 => "Blue wins!",
-            3 => "Yellow wins!",
-            else => "Hacker wins!",
-          });
+          if (
+            game.players.items[winner.?].controller ==
+            Scene.scenes.getPtrConst(.Manual)) "Congratulations! You won!"
+          else
+            switch (winner.?) {
+              0 => "Red wins!",
+              1 => "Green wins!",
+              2 => "Blue wins!",
+              3 => "Yellow wins!",
+              else => "Hacker wins!",
+            });
     }
   }}.update,
   
@@ -112,7 +118,12 @@ pub const scene = Scene{
   {
     try Scene.scenes.get(.Game).render();
 
-    try endingText.render();
+    if (
+      game.players.items[winner.?].controller ==
+      Scene.scenes.getPtrConst(.Manual))
+    {
+      try endingText.render();
+    }
     if (winnerText) |text|
     {
       try text.render();

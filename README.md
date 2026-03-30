@@ -42,4 +42,5 @@
 - Remove emscripten dependency
 - Add guided playthrough
 - Add quick reference
+- Add game banner
 - Add wallet backgrounds (undone)
