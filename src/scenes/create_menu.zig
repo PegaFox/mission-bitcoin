@@ -49,21 +49,23 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    playerLabel = .initFromText(
+    playerLabel = try .initFromText(
       .{0.5, 0.5}, .{0.5, 0.075}, 0.05, menuFont, "choose a color"
     );
     playerButton = try .initFromTexture(.{0.5, 0.5}, .{0.0, 0.2}, 0.15, &.{
       "assets", "images", "player.svg"
     });
 
-    aiLabel =
-      .initFromText(.{0.5, 0.5}, .{0.5, 0.325}, 0.05, menuFont, "AI players");
-    aiText = .initFromText(.{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont, "0");
+    aiLabel = try .initFromText(
+      .{0.5, 0.5}, .{0.5, 0.325}, 0.05, menuFont, "AI players"
+    );
+    aiText = try .initFromText(.{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont, "0");
     try initAiChangeButtons();
 
     startButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "start");
-    backButton = .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "start");
+    backButton =
+      try .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,
@@ -101,7 +103,7 @@ pub const scene = Scene{
         aiCount -= 1;
         aiText.deinit();
         var printBuffer: [32]u8 = undefined;
-        aiText = .initFromText(
+        aiText = try .initFromText(
           .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           try std.fmt.bufPrint(&printBuffer, "{}", .{aiCount}));
       }
@@ -112,7 +114,7 @@ pub const scene = Scene{
         aiCount += 1;
         aiText.deinit();
         var printBuffer: [32]u8 = undefined;
-        aiText = .initFromText(
+        aiText = try .initFromText(
           .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           try std.fmt.bufPrint(&printBuffer, "{}", .{aiCount}));
       }

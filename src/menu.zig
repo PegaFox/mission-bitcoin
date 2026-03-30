@@ -21,7 +21,7 @@ pub const Button = struct
     pos: WinCoord,
     height: f32,
     font: *sdl.TTF_Font,
-    label: []const u8) Self
+    label: []const u8) error{SDL_LoadFail}!Self
   {
     const surface = sdl.TTF_RenderText_Solid(font, label.ptr, label.len, .{
       .r = 0xFF,
@@ -35,7 +35,9 @@ pub const Button = struct
       .origin = origin,
       .pos = pos,
       .height = height,
-      .texture = sdl.SDL_CreateTextureFromSurface(mainspace.renderer, surface),
+      .texture =
+        sdl.SDL_CreateTextureFromSurface(mainspace.renderer, surface) orelse
+          return error.SDL_LoadFail,
     };
   }
 

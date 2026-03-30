@@ -123,7 +123,7 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
   {
     _ = scene.init(gpa) catch |e|
     {
-      log.err("Failed to initialize scene {}\n", .{e});
+      log.err("Failed to initialize scene {} {s}\n", .{e, sdl.SDL_GetError()});
 
       if (@errorReturnTrace()) |trace|
       {

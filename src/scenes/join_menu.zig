@@ -37,7 +37,7 @@ pub const scene = Scene{
       return error.SDL_LoadFail;
     };
 
-    backButton = .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
+    backButton = try .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "back");
 
     return &scene;
   }}.init,

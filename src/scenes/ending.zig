@@ -43,11 +43,11 @@ pub const scene = Scene{
     };
 
     endingText =
-      .initFromText(.{0.5, 0.5}, .{0.5, 0.2}, 0.1, menuFont, "Game Over!");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 0.2}, 0.1, menuFont, "Game Over!");
     restartButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "Play again");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 0.6}, 0.1, menuFont, "Play again");
     menuButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "Main menu");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 0.8}, 0.1, menuFont, "Main menu");
 
     return &scene;
   }}.init,
@@ -96,7 +96,7 @@ pub const scene = Scene{
         break:blk best;
       };
       winnerText =
-        menu.Button.initFromText(
+        try menu.Button.initFromText(
           .{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont,
           switch (winner) {
             0 => "Red wins!",

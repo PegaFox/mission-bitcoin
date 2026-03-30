@@ -42,19 +42,20 @@ pub const scene = Scene{
     };
 
     startButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, menuFont, "start");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, menuFont, "start");
     joinButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "join");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "join");
     if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, 0.25, 0.25, 0.25))
     {
       return error.SDL_RenderFail;
     }
-    guideButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 3.0/6.0}, 0.1, menuFont, "how to play");
+    guideButton = try .initFromText(
+      .{0.5, 0.5}, .{0.5, 3.0/6.0}, 0.1, menuFont, "how to play"
+    );
     creditsButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 4.0/6.0}, 0.1, menuFont, "credits");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 4.0/6.0}, 0.1, menuFont, "credits");
     quitButton =
-      .initFromText(.{0.5, 0.5}, .{0.5, 5.0/6.0}, 0.1, menuFont, "quit");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 5.0/6.0}, 0.1, menuFont, "quit");
 
     return &scene;
   }}.init,

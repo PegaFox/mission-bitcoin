@@ -34,12 +34,12 @@
 - Add epoch arrow sprites (done)
 - Make epoch arrows invisible before ring is clear (done)
 - Add wallet size numbers (done)
+- Add 'How to Play' section (done)
 - Switch to GPU API
 - Add AI functionality
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
-- Add 'How to Play' section
 - Add guided playthrough
 - Add quick reference
 - Add wallet backgrounds (undone)
