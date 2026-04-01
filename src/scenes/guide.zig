@@ -110,6 +110,15 @@ pub const scene = Scene{
           scrollOffset + event.wheel.y*0.05, -backButton.pos[1]+0.9, 0
         );
       },
+      sdl.SDL_EVENT_MOUSE_MOTION => {
+        if (sdl.SDL_GetMouseState(null, null) & sdl.SDL_BUTTON_LMASK > 0)
+        {
+          const winSize = mainspace.winSize();
+          scrollOffset = std.math.clamp(
+            scrollOffset + event.motion.yrel/winSize[1], -backButton.pos[1]+0.9, 0
+          );
+        }
+      },
       else => {}
     }
 

@@ -35,12 +35,12 @@
 - Make epoch arrows invisible before ring is clear (done)
 - Add wallet size numbers (done)
 - Add 'How to Play' section (done)
+- Add AI functionality (done)
+- Add game banner (done)
 - Switch to GPU API
-- Add AI functionality
 - Add networking
 - Add movement animations
 - Remove emscripten dependency
 - Add guided playthrough
 - Add quick reference
-- Add game banner
 - Add wallet backgrounds (undone)
