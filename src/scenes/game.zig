@@ -292,7 +292,7 @@ fn loadTextures() !void
 {
   ringTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "ring.svg"}));
+    try directoryManager.getPath(&.{"assets", "images", "selected.svg"}));
 
   spaceHasTokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
@@ -314,7 +314,12 @@ fn loadTextures() !void
     const spaceType: Space.Type = @enumFromInt(t);
 
     const filename = spaceType.toSnakeStr();
-    const path = filename[0..filename.len-1] ++ ".svg";
+    const path = filename[0..filename.len-1] ++
+      switch (@as(Space.Type, @enumFromInt(t)))
+      {
+        .OrangePill, .Moon => ".png",
+        else => ".svg"
+      };
     log.debug("Loading \"{s}\"\n", .{path});
 
     spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
@@ -487,6 +492,29 @@ fn renderSpaces(spaceArr: []Ring) error{SDL_RenderFail, InvalidPos}!void
         @intCast(x),
         @intCast(y)
       }));
+    }
+  }
+
+  for (0.., players.items) |p, player|
+  {
+    const pos = try boardToWindowPos(
+      spaceArr, @intCast(p), Player.endingPos
+    );
+    const moonRadius = getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)});
+
+    if (!sdl.SDL_SetTextureColorModFloat(
+      ringTexture, player.color[0], player.color[1], player.color[2]))
+    {
+      return error.SDL_RenderFail;
+    }
+    if (!sdl.SDL_RenderTexture(mainspace.renderer, ringTexture, null, &.{
+      .x = pos[0] - moonRadius*0.4,
+      .y = pos[1] - moonRadius*0.4,
+      .w = moonRadius*0.8,
+      .h = moonRadius*0.8,
+    }))
+    {
+      return error.SDL_RenderFail;
     }
   }
 
@@ -756,7 +784,7 @@ pub fn boardToWindowPos(spaceArr: []Ring, playerIndex: ?u8, pos: BoardCoord)
       if (pos == Player.startingPos)
         @min(winSize[0], winSize[1]) * 0.6
       else
-        getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.5;
+        getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.6;
 
     return center + dir*@as(WinCoord, @splat(dis));
   }
