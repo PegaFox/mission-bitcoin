@@ -119,8 +119,10 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
   //  return sdl.SDL_APP_FAILURE;
   //}
 
-  for (Scene.scenes.values) |scene|
+  for (0.., Scene.scenes.values) |s, scene|
   {
+    log.info("Initializing {s}\n", .{@tagName(@as(Scene.ID, @enumFromInt(s)))});
+
     _ = scene.init(gpa) catch |e|
     {
       log.err("Failed to initialize scene {} {s}\n", .{e, sdl.SDL_GetError()});

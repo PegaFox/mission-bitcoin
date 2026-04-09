@@ -53,7 +53,7 @@ pub const Button = struct
       .height = height,
       .texture = sdl.IMG_LoadTexture(
         mainspace.renderer, try directoryManager.getPath(path)
-      ),
+      ) orelse return error.SDL_LoadFail,
     };
   }
 

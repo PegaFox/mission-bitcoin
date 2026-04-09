@@ -36,8 +36,6 @@ pub const scene = Scene{
   {
     _ = allocator;
 
-    log.info("Initializing start menu\n", .{});
-
     menuFont = sdl.TTF_OpenFont(
       try directoryManager.getPath(&.{
         "assets", "fonts", "3270NerdFont-Regular.ttf"

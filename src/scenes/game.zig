@@ -70,7 +70,6 @@ pub const scene = Scene{
 
   .init = struct {fn init(allocator: Allocator) !*const Scene
   {
-    log.info("Initializing game\n", .{});
     gpa = allocator;
 
     try loadTextures();
@@ -292,23 +291,27 @@ fn loadTextures() !void
 {
   ringTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "selected.svg"}));
+    try directoryManager.getPath(&.{"assets", "images", "selected.svg"})
+  ) orelse return error.SDL_LoadFail;
 
   spaceHasTokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
     try directoryManager.getPath(&.{
       "assets", "images", "spaces", "token_space.svg"
-    }));
+    })
+  ) orelse return error.SDL_LoadFail;
   spaceRerollTextures[0] = sdl.IMG_LoadTexture(
     mainspace.renderer,
     try directoryManager.getPath(&.{
       "assets", "images", "spaces", "no_reroll.svg"
-    }));
+    })
+  ) orelse return error.SDL_LoadFail;
   spaceRerollTextures[1] = sdl.IMG_LoadTexture(
     mainspace.renderer,
     try directoryManager.getPath(&.{
       "assets", "images", "spaces", "reroll.svg"
-    }));
+    })
+  ) orelse return error.SDL_LoadFail;
   inline for (0..spaceTypeTextures.values.len) |t|
   {
     const spaceType: Space.Type = @enumFromInt(t);
@@ -324,19 +327,23 @@ fn loadTextures() !void
 
     spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath(&.{"assets", "images", "spaces", path}));
+      try directoryManager.getPath(&.{"assets", "images", "spaces", path})
+    ) orelse return error.SDL_LoadFail;
   }
   arrowTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "epoch_arrow.svg"}));
+    try directoryManager.getPath(&.{"assets", "images", "epoch_arrow.svg"})
+  ) orelse return error.SDL_LoadFail;
 
   tokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "token.png"}));
+    try directoryManager.getPath(&.{"assets", "images", "token.png"})
+  ) orelse return error.SDL_LoadFail;
 
   playerTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "player.svg"}));
+    try directoryManager.getPath(&.{"assets", "images", "player.svg"})
+  ) orelse return error.SDL_LoadFail;
 }
 
 fn loadBoard(allocator: Allocator) !void

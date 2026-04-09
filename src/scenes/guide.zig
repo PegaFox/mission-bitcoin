@@ -14,7 +14,7 @@ const directoryManager = @import("../directory_manager.zig");
 
 var gpa: Allocator = undefined;
 
-const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
+const fontQuality = 50; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
 
 var titleButton: menu.Button = undefined;
@@ -43,8 +43,6 @@ pub const scene = Scene{
   .init = struct {fn init(allocator: Allocator) !*const Scene
   {
     gpa = allocator;
-
-    log.info("Initializing start menu\n", .{});
 
     menuFont = sdl.TTF_OpenFont(
       try directoryManager.getPath(&.{

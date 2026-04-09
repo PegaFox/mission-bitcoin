@@ -116,6 +116,9 @@ pub fn build(b: *std.Build, mod: *Module) void
 
   const emLink = b.addSystemCommand(&.{
     "emcc",
+    "-g",
+    "-v",
+    std.fmt.comptimePrint("-sINITIAL_MEMORY={}", .{1024*64*1024}),
     //"-sUSE_SDL=3",
     //"-sUSE_SDL_IMAGE=3",
     "-sUSE_SDL_TTF=3",
@@ -140,8 +143,12 @@ pub fn build(b: *std.Build, mod: *Module) void
   const htmlOut = emLink.addOutputFileArg(htmlName);
   const jsOut = htmlOut.dirname().path(b, jsName);
   const wasmOut = htmlOut.dirname().path(b, wasmName);
+
+  const htmlInstall = b.addInstallBinFile(htmlOut, htmlName);
+  htmlInstall.step.dependOn(&emLink.step);
+
   //b.installArtifact(exe);
-  b.getInstallStep().dependOn(&b.addInstallBinFile(htmlOut, htmlName).step);
+  b.getInstallStep().dependOn(&htmlInstall.step);
   b.getInstallStep().dependOn(&b.addInstallBinFile(jsOut, jsName).step);
   b.getInstallStep().dependOn(&b.addInstallBinFile(wasmOut, wasmName).step);
 }
