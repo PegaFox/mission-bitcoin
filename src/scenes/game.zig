@@ -716,17 +716,49 @@ fn renderPlayerWallet(
     player.value.coldStorageTokens
   );
 
-  const radius =
-    getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.5;
-  try renderTokenStack(
-    try boardToWindowPos(
+  if (player.value.lostTokens > 0)
+  {
+    const pos = try boardToWindowPos(
       spaceArr,
       @intCast(players.items.len-playerIndex-1),
       Player.endingPos
-    ) + WinCoord{0, radius*0.5},
-    radius,
-    players.items[players.items.len-playerIndex-1].value.lostTokens
-  );
+    );
+    const radius =
+      getSpaceRadius(spaceArr, .{0, @intCast(spaceArr.len-1)}) * 0.4;
+    //try renderTokenStack(
+    //  try boardToWindowPos(
+    //    spaceArr,
+    //    @intCast(players.items.len-playerIndex-1),
+    //    Player.endingPos
+    //  ) + WinCoord{0, radius*0.5},
+    //  radius,
+    //  players.items[players.items.len-playerIndex-1].value.lostTokens
+    //);
+    noErr &= sdl.SDL_RenderTexture(mainspace.renderer, tokenTexture, null, &.{
+      .x = pos[0] - radius,
+      .y = pos[1] - radius,
+      .w = radius*2,
+      .h = radius*2,
+    });
+
+    const winSize = mainspace.winSize();
+    var countLabel = menu.Button.initFromText(
+      .{0.5, 0.5}, 
+      WinCoord{
+        pos[0],
+        pos[1]
+      } / winSize,
+      0.02,
+      menuFont,
+      &std.fmt.digits2(player.value.lostTokens)
+    ) catch return;
+
+    noErr &= sdl.SDL_SetTextureColorModFloat(countLabel.texture, 0.0, 0.0, 0.0);
+
+    try countLabel.render();
+
+    countLabel.deinit();
+  }
 
   try exchangeLabel.render();
   try coldStorageLabel.render();
