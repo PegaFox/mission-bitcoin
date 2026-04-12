@@ -119,6 +119,21 @@ fn spaceValue(board: []Ring, pos: BoardCoord) i16
 
   const currentPlayer = &game.players.items[game.currentPlayer].value;
 
+  var otherColdStorage: game.TokenType = 0;
+  var otherScore: game.TokenType = 0;
+  //var otherTotal: game.TokenType = 0;
+  for (game.players.items) |*player|
+  {
+    if (&player.value == currentPlayer)
+    {
+      continue;
+    }
+
+    otherColdStorage = @max(otherColdStorage, player.value.coldStorageTokens);
+    otherScore = @max(otherScore, player.value.ownedTokens());
+    //otherTotal = @max(otherTotal, player.value.allTokens());
+  }
+
   const ring = &board[pos.?[1]];
   const space = &ring.spaces[pos.?[0]];
 
@@ -132,14 +147,30 @@ fn spaceValue(board: []Ring, pos: BoardCoord) i16
     }
   } else
   {
+    // Exchange Hack, Orange Pill and 6102 can be tweaked and made more complex
     score += switch (space.type)
     {
       .Default => 0,
-      .ColdStorage => 0,
-      .ExchangeHack => 0,
-      .OrangePill => 0,
-      .Exec6102 => 0,
-      .Moon => 2140,
+      .ColdStorage =>
+        if (currentPlayer.exchangeTokens > 1)
+          currentPlayer.exchangeTokens*5
+        else
+          0,
+      .ExchangeHack => if (
+          currentPlayer.ownedTokens() < otherScore and
+          currentPlayer.coldStorageTokens > otherColdStorage)
+          (currentPlayer.coldStorageTokens-otherColdStorage)*5
+        else
+          -10,
+      .OrangePill => -10,
+      .Exec6102 =>
+        if (
+          currentPlayer.ownedTokens() < otherScore and
+          currentPlayer.coldStorageTokens > otherColdStorage)
+          (currentPlayer.coldStorageTokens-otherColdStorage)*5
+        else
+          -20,
+      .Moon => if (currentPlayer.allTokens() > otherScore) 2140 else -20,
     };
   }
 
