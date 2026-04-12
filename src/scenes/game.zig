@@ -794,7 +794,7 @@ fn renderTokenStack(pos: WinCoord, radius: f32, count: TokenType)
     .{0.5, 0.5}, 
     WinCoord{
       pos[0],
-      pos[1] - totalTokens*radius*0.1
+      pos[1] - radius - totalTokens*radius*0.1
     } / winSize,
     0.02,
     menuFont,
