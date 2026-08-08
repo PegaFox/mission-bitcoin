@@ -31,8 +31,22 @@ pub fn build(b: *std.Build, mod: *Module) void
     .default_target_config = false,
   }).builder.dependency("sdl", .{});
   mod.addIncludePath(sdl.path("include"));
+
+  const cmakeOptimizeArg = switch (mod.optimize.?)
+  {
+    .Debug => "-DCMAKE_BUILD_TYPE=Debug",
+    .ReleaseSafe => "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+    .ReleaseFast => "-DCMAKE_BUILD_TYPE=Release",
+    .ReleaseSmall => "-DCMAKE_BUILD_TYPE=MinSizeRel",
+  };
     
-  const sdlBuild = b.addSystemCommand(&.{emcmake, "cmake"});
+  const sdlBuild = b.addSystemCommand(&.{
+    emcmake,
+    "cmake",
+    "--debug-output",
+    "-DCMAKE_C_FLAGS=\"-pthread\"",
+    cmakeOptimizeArg,
+  });
   sdlBuild.addArg("-S");
   sdlBuild.addDirectoryArg(sdl.path("."));
   sdlBuild.addArg("-B");
@@ -47,11 +61,21 @@ pub fn build(b: *std.Build, mod: *Module) void
     .target = mod.resolved_target,
   }).builder.dependency("SDL_image", .{});
   mod.addIncludePath(image.path("include"));
-  const imageBuild = b.addSystemCommand(&.{emcmake, "cmake", "--debug-output"});
+  const imageBuild = b.addSystemCommand(&.{
+    emcmake,
+    "cmake",
+    "--debug-output",
+    "-DCMAKE_C_FLAGS=\"-pthread\"",
+    cmakeOptimizeArg,
+  });
   imageBuild.step.dependOn(&sdlMake.step);
 
+  var io = std.Io.Threaded.init(std.mem.Allocator.failing, .{});
+  defer io.deinit();
+
   const cwdPath =
-    std.fs.cwd().realpathAlloc(b.allocator, ".") catch unreachable;
+    std.Io.Dir.cwd().realPathFileAlloc(io.io(), ".", b.allocator) catch
+      unreachable;
   defer b.allocator.free(cwdPath);
   const prefix =
     std.mem.concat(b.allocator, u8, &.{"-DSDL3_DIR=", cwdPath, "/"}) catch
@@ -118,6 +142,10 @@ pub fn build(b: *std.Build, mod: *Module) void
     "emcc",
     "-g",
     "-v",
+    // Explicitely enable concurrency
+    "-pthread",
+    "-sPTHREAD_POOL_SIZE=3",
+    "-sWASM_WORKERS",
     std.fmt.comptimePrint("-sINITIAL_MEMORY={}", .{1024*64*1024}),
     //"-sUSE_SDL=3",
     //"-sUSE_SDL_IMAGE=3",

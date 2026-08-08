@@ -37,9 +37,14 @@
 - Add 'How to Play' section (done)
 - Add AI functionality (done)
 - Add game banner (done)
+- Add networking (done)
 - Switch to GPU API
-- Add networking
 - Add movement animations
+- Add mobile build
+- Add qr code scanning for join codes
+- Add join code aliasing
+- Switch to ipv6 for connections
+- Polish text inputs
 - Remove emscripten dependency
 - Add guided playthrough
 - Add quick reference

@@ -24,7 +24,7 @@ pub const std_options = std.Options{
   .logFn = logger.logFn,
 };
 
-pub var startTime: i64 = undefined;
+pub var startTime: std.Io.Timestamp = undefined;
 
 pub var window: *sdl.SDL_Window = undefined;
 pub var renderer: *sdl.SDL_Renderer = undefined;
@@ -50,7 +50,25 @@ var randomEngine: std.Random.DefaultPrng = undefined;
 pub var rand = randomEngine.random();
 
 pub var running = true;
-var lastFrameTick: i64 = 0;
+pub var lastFrameTick: std.Io.Timestamp = .zero;
+
+/// Emscripten needs c allocator for debug output
+pub const debug = struct
+{
+  pub fn getDebugInfoAllocator() Allocator
+  {
+    if (builtin.os.tag == .emscripten)
+    {
+      return std.heap.c_allocator;
+    }
+
+    // Otherwise, use the same method std.debug uses
+    const S = struct {
+        var arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
+    };
+    return S.arena.allocator();
+  }
+};
 
 var allocator = if (builtin.os.tag == .emscripten)
   @as(void, undefined)
@@ -60,10 +78,26 @@ var allocator = if (builtin.os.tag == .emscripten)
   //}
 else
   std.heap.DebugAllocator(.{}).init;
-pub var gpa = if (builtin.os.tag == .emscripten)
+pub const gpa = if (builtin.os.tag == .emscripten)
   std.heap.c_allocator
 else
   allocator.allocator();
+
+// Sadly, these must be initialized from main
+var ioImpl: std.Io.Threaded = undefined;
+// If emscripten, leave as failing
+pub const io: std.Io = ioImpl.io();
+  //if (builtin.os.tag != .emscripten) ioImpl.io() else .failing;
+
+_: void = if (builtin.zig_version != .{.major = 0, .minor = 16, .patch = 0})
+  @compileLog("Zig version is not 0.16.0, consider removing the following lines"),
+
+//pub const std_options_debug_io =
+//  if (builtin.os.tag == .emscripten) std.Io.failing
+//  else std.Options.debug_threaded_io.?.io();
+//pub const panic =
+//  if (builtin.os.tag == .emscripten) std.debug.no_panic
+//  else std.debug.simple_panic;
 
 fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
   sdl.SDL_AppResult
@@ -71,9 +105,18 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
   _ = appstate;
   _ = argc;
   _ = argv;
-  startTime = @intCast(std.time.nanoTimestamp());
 
-  randomEngine = .init(@intCast(@abs(std.time.milliTimestamp())));
+  ioImpl = .init(gpa, .{});
+
+  if (
+    builtin.zig_version.major != 0 or
+    builtin.zig_version.minor != 16 or
+    builtin.zig_version.patch != 0)
+    @compileLog("Zig version is not 0.16.0, consider removing the following if statement");
+
+  startTime = std.Io.Timestamp.now(io, .awake);
+
+  randomEngine = .init(@abs(startTime.toMicroseconds()));
 
   log.info("loading default world layout\n", .{});
 
@@ -129,7 +172,7 @@ fn init(appstate: ?*?*anyopaque, argc: i32, argv: ?[*]?[*:0]u8) callconv(.c)
 
       if (@errorReturnTrace()) |trace|
       {
-        std.debug.dumpStackTrace(trace.*);
+        std.debug.dumpErrorReturnTrace(trace);
       }
 
       return sdl.SDL_APP_FAILURE;
@@ -143,11 +186,12 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
 {
   _ = appstate;
 
-  if (sdl.SDL_GetWindowFlags(window) & sdl.SDL_WINDOW_INPUT_FOCUS > 0)
+  //if (sdl.SDL_GetWindowFlags(window) & sdl.SDL_WINDOW_INPUT_FOCUS > 0)
   {
-    if (std.time.milliTimestamp() - lastFrameTick > std.time.ms_per_s / 60)
+    const deltaTime = lastFrameTick.untilNow(io, .awake);
+    if (deltaTime.toNanoseconds() > std.time.ns_per_s / 60)
     {
-      lastFrameTick = std.time.milliTimestamp();
+      lastFrameTick = lastFrameTick.addDuration(deltaTime);
 
       Scene.currentScene.update() catch |e|
       {
@@ -155,7 +199,7 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
 
         if (@errorReturnTrace()) |trace|
         {
-          std.debug.dumpStackTrace(trace.*);
+          std.debug.dumpErrorReturnTrace(trace);
         }
 
         return sdl.SDL_APP_FAILURE;
@@ -176,7 +220,7 @@ fn update(appstate: ?*anyopaque) callconv(.c) sdl.SDL_AppResult
 
         if (@errorReturnTrace()) |trace|
         {
-          std.debug.dumpStackTrace(trace.*);
+          std.debug.dumpErrorReturnTrace(trace);
         }
 
         return sdl.SDL_APP_FAILURE;
@@ -225,7 +269,7 @@ fn handleEvent(appstate: ?*anyopaque, event: ?*sdl.SDL_Event)
 
       if (@errorReturnTrace()) |trace|
       {
-        std.debug.dumpStackTrace(trace.*);
+        std.debug.dumpErrorReturnTrace(trace);
       }
 
       return sdl.SDL_APP_FAILURE;
@@ -248,7 +292,7 @@ fn deinit(appstate: ?*anyopaque, result: sdl.SDL_AppResult) callconv(.c) void
     scene.deinit() catch
       if (@errorReturnTrace()) |trace|
       {
-        std.debug.dumpStackTrace(trace.*);
+        std.debug.dumpErrorReturnTrace(trace);
       };
   }
 

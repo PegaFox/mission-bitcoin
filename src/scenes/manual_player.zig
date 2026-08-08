@@ -36,7 +36,7 @@ pub const scene = Scene{
 
     selectedTexture = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath(&.{"assets", "images", "selected.svg"})
+      try directoryManager.getPath(mainspace.io, &.{"assets", "images", "selected.svg"})
     );
 
     return &scene;
@@ -189,7 +189,7 @@ fn renderSelectionCircleAtPixel(pos: WinCoord)
   error{SDL_RenderFail}!void
 {
   var timeOffset: f32 = 
-    @floatFromInt(@mod(std.time.milliTimestamp(), 1000));
+    @floatFromInt(@mod(mainspace.lastFrameTick.toMilliseconds(), 1000));
   timeOffset = @sin(timeOffset * 0.002 * std.math.pi);
 
   const winSize = game.boardRenderArea()[1];
@@ -218,21 +218,4 @@ pub fn hoveredSpace() BoardCoord
     mPos[0],
     mPos[1]
   });
-}
-
-// Parsed data must be freed with .deinit()
-fn jsonFromFile(allocator: Allocator, T: type, path: []const u8)
-  !std.json.Parsed(T)
-{
-  const boardFilePath =
-    try directoryManager.getPath(path);
-  var boardFile = try std.fs.openFileAbsolute(boardFilePath, .{});
-  defer boardFile.close();
-
-  var readBuffer: [1024]u8 = undefined;
-  var fileReader = boardFile.reader(&readBuffer);
-  var jsonReader = std.json.Reader.init(allocator, &fileReader.interface);
-  defer jsonReader.deinit();
-
-  return try std.json.parseFromTokenSource(T, allocator, &jsonReader, .{});
 }

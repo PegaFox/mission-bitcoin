@@ -9,9 +9,12 @@ const directoryManager = @import("../directory_manager.zig");
 const mainspace = @import("../main.zig");
 const sdl = mainspace.sdl;
 
+const serialize = @import("../serialize.zig");
+
 const game = @import("game.zig");
 
 const Player = @import("../player.zig");
+const remote = @import("remote_player.zig");
 
 const BoardCoord = Player.Pos;
 
@@ -23,7 +26,7 @@ pub fn reset() void
 {
   tick = 0;
 }
-pub var chosenNumber: u3 = 0;
+pub var chosenNumber: u3 = undefined;
 const ticksPerChange = 4;
 
 var baseTexture: *sdl.SDL_Texture = undefined;
@@ -38,19 +41,23 @@ pub const scene = Scene{
 
     baseTexture = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath(&.{"assets", "images", "dice", "base.svg"})
+      try directoryManager.getPath(mainspace.io, &.{
+        "assets", "images", "dice", "base.svg"
+      })
     );
     for (0..numberTextures.len) |n|
     {
       numberTextures[n] = sdl.IMG_LoadTexture(
         mainspace.renderer,
-        try directoryManager.getPath(&.{
+        try directoryManager.getPath(mainspace.io, &.{
           "assets",
           "images",
           "dice",
           (&std.fmt.digitToChar(@truncate(n+1), .lower))[0..1] ++ ".svg"})
       );
     }
+
+    chosenNumber = game.random.intRangeAtMost(u3, 1, 6);
 
     return &scene;
   }}.init,
@@ -73,7 +80,7 @@ pub const scene = Scene{
   {
     if (tick % ticksPerChange == 0)
     {
-      chosenNumber = mainspace.rand.intRangeAtMost(u3, 1, 6);
+      chosenNumber = game.random.intRangeAtMost(u3, 1, 6);
     }
     tick += 1;
 

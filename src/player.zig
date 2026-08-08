@@ -8,6 +8,9 @@ const Scene = @import("scene.zig");
 const Ring = @import("ring.zig");
 const game = @import("scenes/game.zig");
 
+const serialize = @import("serialize.zig");
+const remote = @import("scenes/remote_player.zig");
+
 const mainspace = @import("main.zig");
 
 pub const Pos = ?@Vector(2, u8);
@@ -42,12 +45,66 @@ pub fn allTokens(self: Self) game.TokenType
 pub fn move(self: *Self, parent: []Ring, pos: Pos, target: ?*Self)
   error{MissingTarget, InvalidTarget}!void
 {
+  const currentController = game.players.items[game.currentPlayer].controller;
+
   self.pos = pos;
 
   const ring = &parent[pos.?[1]];
   const space = &ring.spaces[pos.?[0]];
 
   defer {
+    if (currentController != Scene.scenes.getPtrConst(.Remote))
+    {
+      for (remote.connections.items) |connection|
+      {
+        var writeBuffer: [@sizeOf(remote.NetPlayer)]u8 = undefined;
+        var connWriter = connection.writer(mainspace.io, &writeBuffer);
+        const writer = &connWriter.interface;
+
+        writer.writeStruct(serialize.serialize(pos), .big) catch
+        {
+          log.err(
+            "Failed to send position to peer {f}: {}",
+            .{connection.socket.address, connWriter.err.?}
+          );
+        };
+        if (target) |t|
+        {
+          const targetEntry: [*]game.PlayerEntry = @ptrCast(
+            @as(*game.PlayerEntry, @alignCast(@fieldParentPtr("value", t)))
+          );
+          const index = targetEntry-game.players.items.ptr;
+          writer.writeInt(remote.NetPlayerIndex, @intCast(index), .big) catch
+          {
+            log.err(
+              "Failed to send target to peer {f}: {}",
+              .{connection.socket.address, connWriter.err.?}
+            );
+          };
+        } else
+        {
+          // Use max value as no selection
+          writer.writeInt(
+            remote.NetPlayerIndex, std.math.maxInt(game.PlayerIndex), .big
+          ) catch
+          {
+            log.err(
+              "Failed to send target to peer {f}: {}",
+              .{connection.socket.address, connWriter.err.?}
+            );
+          };
+        }
+
+        writer.flush() catch
+        {
+          log.err(
+            "Failed to send move to peer {f}: {}",
+            .{connection.socket.address, connWriter.err.?}
+          );
+        };
+      }
+    }
+
     log.info("Getting moves for player {}\n", .{game.currentPlayer});
     if (space.type == .Moon)
     {

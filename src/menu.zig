@@ -1,3 +1,7 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const Io = std.Io;
+
 const directoryManager = @import("directory_manager.zig");
 
 const mainspace = @import("main.zig");
@@ -23,6 +27,23 @@ pub const Button = struct
     font: *sdl.TTF_Font,
     label: []const u8) error{SDL_LoadFail}!Self
   {
+    if (label.len == 0)
+    {
+      return .{
+        .origin = origin,
+        .pos = pos,
+        .height = height,
+        .texture =
+          sdl.SDL_CreateTexture(
+            mainspace.renderer,
+            sdl.SDL_PIXELFORMAT_RGBA32,
+            sdl.SDL_TEXTUREACCESS_STATIC,
+            1,
+            1
+          ) orelse return error.SDL_LoadFail,
+      };
+    }
+
     const surface = sdl.TTF_RenderText_Solid(font, label.ptr, label.len, .{
       .r = 0xFF,
       .g = 0xFF,
@@ -42,6 +63,7 @@ pub const Button = struct
   }
 
   pub fn initFromTexture(
+    io: Io,
     origin: WinCoord,
     pos: WinCoord,
     height: f32,
@@ -52,7 +74,7 @@ pub const Button = struct
       .pos = pos,
       .height = height,
       .texture = sdl.IMG_LoadTexture(
-        mainspace.renderer, try directoryManager.getPath(path)
+        mainspace.renderer, try directoryManager.getPath(io, path)
       ) orelse return error.SDL_LoadFail,
     };
   }
@@ -120,3 +142,75 @@ pub const Button = struct
   }
 };
 
+pub const TextBox = struct
+{
+  const Self = @This();
+
+  pub const Oom = Allocator.Error;
+  pub const SdlFail = error{SDL_LoadFail};
+  pub const Error = Oom || SdlFail;
+
+  /// syncTexture should be run after modification
+  text: std.ArrayList(u8),
+  font: *sdl.TTF_Font,
+  hitbox: Button,
+
+  pub fn init(
+    allocator: Allocator,
+    origin: WinCoord,
+    pos: WinCoord,
+    height: f32,
+    font: *sdl.TTF_Font) Error!Self
+  {
+    return .{
+      .text = try .initCapacity(allocator, 64),
+      .font = font,
+      .hitbox = try .initFromText(origin, pos, height, font, ""),
+    };
+  }
+
+  pub fn deinit(self: *Self, allocator: Allocator) void
+  {
+    self.hitbox.deinit();
+    self.text.deinit(allocator);
+  }
+
+  pub fn pushString(self: *Self, allocator: Allocator, text: []const u8)
+    Error!void
+  {
+    try self.text.appendSlice(allocator, text);
+
+    try self.syncTexture();
+  }
+
+  /// Pops popLen characters from self.text and updates the texture
+  /// If popLen > self.text.items.len, empties self.text
+  pub fn popString(self: *Self, popLen: usize)
+    SdlFail!void
+  {
+    if (popLen < self.text.items.len)
+    {
+      self.text.shrinkRetainingCapacity(self.text.items.len - popLen);
+    } else
+    {
+      self.text.clearRetainingCapacity();
+    }
+
+    try self.syncTexture();
+  }
+
+  /// renders self.text to self.hitbox.texture
+  pub fn syncTexture(self: *Self) SdlFail!void
+  {
+    const hitboxConfig = self.hitbox;
+
+    self.hitbox.deinit();
+
+    self.hitbox = try .initFromText(
+      hitboxConfig.origin,
+      hitboxConfig.pos,
+      hitboxConfig.height,
+      self.font,
+      self.text.items);
+  }
+};

@@ -17,6 +17,7 @@ const Player = @import("../player.zig");
 
 const dice = @import("dice.zig");
 const manual = @import("manual_player.zig");
+const remote = @import("remote_player.zig");
 
 const BoardCoord = Player.Pos;
 
@@ -51,15 +52,23 @@ pub const PlayerEntry = struct {
   controller: ?*const Scene,
   value: Player,
 };
-pub var players: std.ArrayList(PlayerEntry) = .empty;
 
-pub var currentPlayer: u8 = undefined;
+pub const maxPlayers = 4;
+
+var playerBuffer: [maxPlayers]PlayerEntry = undefined;
+pub var players: std.ArrayList(PlayerEntry) = .initBuffer(&playerBuffer);
+
+pub const PlayerIndex = std.math.IntFittingRange(0, maxPlayers);
+pub var currentPlayer: PlayerIndex = undefined;
+
+pub var randomGen: std.Random.Xoshiro256 = undefined;
+pub var random: std.Random = randomGen.random();
 
 // Updates currentPlayerIndex and currentPlayer to be the next in line
 pub fn nextTurn() void
 {
   currentPlayer =
-    (currentPlayer + 1) % @as(u8, @intCast(players.items.len));
+    (currentPlayer + 1) % @as(PlayerIndex, @intCast(players.items.len));
 }
 
 //var moves: [4]BoardCoord = @splat(null);
@@ -72,10 +81,10 @@ pub const scene = Scene{
   {
     gpa = allocator;
 
-    try loadTextures();
+    try loadTextures(mainspace.io);
 
     menuFont = sdl.TTF_OpenFont(
-      try directoryManager.getPath(&.{
+      try directoryManager.getPath(mainspace.io, &.{
         "assets", "fonts", "3270NerdFont-Regular.ttf"
       }),
       fontQuality
@@ -92,21 +101,32 @@ pub const scene = Scene{
       .{0.5, 0.5}, .{0.55, 0.98}, 0.02, menuFont, "Cold Storage"
     );
 
+    randomGen =
+      .init(@abs(std.Io.Timestamp.now(mainspace.io, .awake).toMicroseconds()));
+
     const jsonOut =
-      try jsonFromFile(allocator, []struct {
+      try jsonFromFile(mainspace.io, allocator, []struct {
         color: [3]f32,
         entryIndex: u8,
       }, &.{"assets", "metadata", "players.json"});
     defer jsonOut.deinit();
 
-    try players.ensureTotalCapacity(allocator, jsonOut.value.len);
+    if (jsonOut.value.len > players.capacity)
+    {
+      log.err(
+        "Too many entries in players.json ({} found, max: {})\n",
+        .{jsonOut.value.len, maxPlayers}
+      );
+      return std.json.ParseFromValueError.Overflow;
+    }
+
     log.debug("Player array position: {*}\n", .{players.items});
 
     for (jsonOut.value) |player|
     {
       log.info("Loading player {any}\n", .{player.color});
 
-      players.append(allocator, .{
+      players.appendAssumeCapacity(.{
         .color = player.color ++ .{1.0},
         .controller = null,//Scene.scenes.getPtrConst(.AI),
         .value = .{
@@ -116,13 +136,13 @@ pub const scene = Scene{
           .coldStorageTokens = 0,
           .lostTokens = 0,
         }
-      }) catch unreachable;
+      });
     }
 
-    try loadBoard(allocator);
+    try loadBoard(mainspace.io, allocator);
 
     currentPlayer =
-      mainspace.rand.uintLessThan(u8, @intCast(players.items.len));
+      mainspace.rand.uintLessThan(PlayerIndex, @intCast(players.items.len));
 
     return &scene;
   }}.init,
@@ -246,8 +266,6 @@ pub const scene = Scene{
     board.deinit(gpa);
     spaces.deinit(gpa);
 
-    players.deinit(gpa);
-
     coldStorageLabel.deinit();
     exchangeLabel.deinit();
     sdl.TTF_CloseFont(menuFont);
@@ -287,28 +305,28 @@ pub fn reset() void
   }
 }
 
-fn loadTextures() !void
+fn loadTextures(io: std.Io) !void
 {
   ringTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "selected.svg"})
+    try directoryManager.getPath(io, &.{"assets", "images", "selected.svg"})
   ) orelse return error.SDL_LoadFail;
 
   spaceHasTokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{
+    try directoryManager.getPath(io, &.{
       "assets", "images", "spaces", "token_space.svg"
     })
   ) orelse return error.SDL_LoadFail;
   spaceRerollTextures[0] = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{
+    try directoryManager.getPath(io, &.{
       "assets", "images", "spaces", "no_reroll.svg"
     })
   ) orelse return error.SDL_LoadFail;
   spaceRerollTextures[1] = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{
+    try directoryManager.getPath(io, &.{
       "assets", "images", "spaces", "reroll.svg"
     })
   ) orelse return error.SDL_LoadFail;
@@ -327,29 +345,29 @@ fn loadTextures() !void
 
     spaceTypeTextures.values[t] = sdl.IMG_LoadTexture(
       mainspace.renderer,
-      try directoryManager.getPath(&.{"assets", "images", "spaces", path})
+      try directoryManager.getPath(io, &.{"assets", "images", "spaces", path})
     ) orelse return error.SDL_LoadFail;
   }
   arrowTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "epoch_arrow.svg"})
+    try directoryManager.getPath(io, &.{"assets", "images", "epoch_arrow.svg"})
   ) orelse return error.SDL_LoadFail;
 
   tokenTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "token.png"})
+    try directoryManager.getPath(io, &.{"assets", "images", "token.png"})
   ) orelse return error.SDL_LoadFail;
 
   playerTexture = sdl.IMG_LoadTexture(
     mainspace.renderer,
-    try directoryManager.getPath(&.{"assets", "images", "player.svg"})
+    try directoryManager.getPath(io, &.{"assets", "images", "player.svg"})
   ) orelse return error.SDL_LoadFail;
 }
 
-fn loadBoard(allocator: Allocator) !void
+fn loadBoard(io: std.Io, allocator: Allocator) !void
 {
   const jsonOut =
-    try jsonFromFile(allocator, [][]Space,
+    try jsonFromFile(io, allocator, [][]Space,
       &.{"assets", "metadata", "board.json"});
   defer jsonOut.deinit();
 
@@ -400,16 +418,16 @@ fn loadBoard(allocator: Allocator) !void
 }
 
 // Parsed data must be freed with .deinit()
-fn jsonFromFile(allocator: Allocator, T: type, path: []const []const u8)
+fn jsonFromFile(io: std.Io, allocator: Allocator, T: type, path: []const []const u8)
   !std.json.Parsed(T)
 {
   const boardFilePath =
-    try directoryManager.getPath(path);
-  var boardFile = try std.fs.openFileAbsolute(boardFilePath, .{});
-  defer boardFile.close();
+    try directoryManager.getPath(io, path);
+  var boardFile = try std.Io.Dir.openFileAbsolute(io, boardFilePath, .{});
+  defer boardFile.close(io);
 
   var readBuffer: [1024]u8 = undefined;
-  var fileReader = boardFile.reader(&readBuffer);
+  var fileReader = boardFile.reader(io, &readBuffer);
   var jsonReader = std.json.Reader.init(allocator, &fileReader.interface);
   defer jsonReader.deinit();
 
@@ -663,7 +681,7 @@ fn renderPlayerWallet(
   //  sdl.SDL_LOGICAL_PRESENTATION_DISABLED
   //);
 
-  if (player.controller == Scene.scenes.getPtrConst(.AI))
+  if (player.controller != Scene.scenes.getPtrConst(.Manual))
   {
     noErr &= sdl.SDL_SetTextureColorModFloat(
       playerTexture,

@@ -1,7 +1,7 @@
 .{
     .name = .mission_bitcoin,
     .version = "0.0.0",
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
         .gui_lib = .{
@@ -13,16 +13,16 @@
         //    .hash = "sdl-0.4.1+3.4.2-SDL--umApAGq9hhwKcquz9eEQtR1x7S3pnQUe2mNpjVj",
         //},
         .sdl = .{
-            .url = "git+https://github.com/allyourcodebase/SDL3.git#467a4baad2acdda1bcf717065793fbbdf2569f8d",
-            .hash = "sdl-0.0.0-i4QD0WN-qQB1RKdRC9-6iZyTco2jIIr3y2DFrAz-D9CH",
+            .url = "git+https://github.com/allyourcodebase/SDL3.git#14323c217f7a23b409909508ea6b4901ba2567c5",
+            .hash = "sdl-1.0.1+3.4.4-i4QD0aSSqQCKa4hqLCExg4sjLPWkuFsXEvl8kmD6zakm",
         },
         .SDL_image = .{
-            .url = "git+https://github.com/allyourcodebase/SDL_image.git#971b1227ecde1450c95acef110191a775cd9da23",
-            .hash = "SDL_image-3.4.0--aJoHcoWAAB0fnqTA4tSSKuhV4Lt_mAPzqiG64dGdPup",
+            .url = "git+https://github.com/allyourcodebase/SDL_image.git#fbd79df4605840c5e4a160d30a7364808cdd48e8",
+            .hash = "SDL_image-3.4.4--aJoHcwWAAA4iFCYQaE6VUBpWDGiSJctr8OG0LPQspFH",
         },
         .SDL_ttf = .{
-            .url = "git+https://github.com/allyourcodebase/SDL_ttf.git#6b43781327f3929ec6cf29d01a83bcf329752820",
-            .hash = "SDL_ttf-3.2.2-PNW5xN4RAACd6tBC0zAYHC_-MdGnpdilonkq5Dw0RZMz",
+            .url = "git+https://github.com/allyourcodebase/SDL_ttf.git#754060bb24756f28545f56e9ef6ac0accf6045bb",
+            .hash = "SDL_ttf-3.2.3-2-PNW5xNYRAAAyzznhTTMh40QAzryQ5LlAZ7VM1-IR5p6C",
         },
         //.emscripten = .{
         //    .url = "git+https://github.com/emscripten-core/emscripten#5.0.3",

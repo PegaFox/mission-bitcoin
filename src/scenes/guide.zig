@@ -45,7 +45,7 @@ pub const scene = Scene{
     gpa = allocator;
 
     menuFont = sdl.TTF_OpenFont(
-      try directoryManager.getPath(&.{
+      try directoryManager.getPath(mainspace.io, &.{
         "assets", "fonts", "3270NerdFont-Regular.ttf"
       }),
       fontQuality

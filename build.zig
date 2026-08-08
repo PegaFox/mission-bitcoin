@@ -22,7 +22,16 @@ const availableTargets = [_]TargetInfo{
       .abi = .gnu,
     },
     .build = buildPc,
-    .name = "linux",
+    .name = "linux_x86",
+  },
+  .{
+    .target = .{
+      .cpu_arch = .aarch64,
+      .os_tag = .linux,
+      .abi = .gnu,
+    },
+    .build = buildPc,
+    .name = "linux_arm",
   },
   .{
     .target = .{
@@ -45,6 +54,23 @@ const availableTargets = [_]TargetInfo{
     .target = .{
       .cpu_arch = .wasm32,
       .os_tag = .emscripten,
+      .cpu_features_add = feat:{
+        var set = Target.Cpu.Feature.Set.empty;
+
+        const features = Target.Cpu.Arch.allFeaturesList(.wasm32);
+        for (features) |feat|
+        {
+          //@compileLog(feat);
+          if (
+            std.mem.eql(u8, feat.name, "atomics") or
+            std.mem.eql(u8, feat.name, "bulk_memory"))
+          {
+            set.addFeature(feat.index);
+          }
+        }
+
+        break:feat set;
+      },
     },
     .build = wasm.build,
     .name = "wasm",
@@ -53,22 +79,18 @@ const availableTargets = [_]TargetInfo{
 
 pub fn build(b: *std.Build) void {
   //const target = b.standardTargetOptions(.{});
-  const TargetEnum = comptime trgt:
+  const TargetEnum = comptime target:
   {
-    var Enum = std.builtin.Type.Enum{
-      .tag_type = u8,
-      .fields = &.{},
-      .decls = &.{},
-      .is_exhaustive = false,
-    };
-    for (availableTargets) |target|
+    const BackingInt = std.math.IntFittingRange(0, availableTargets.len-1);
+    var names: [availableTargets.len][]const u8 = undefined;
+    var values: [availableTargets.len]BackingInt = undefined;
+
+    for (0..availableTargets.len) |t|
     {
-      Enum.fields = Enum.fields ++ [1]std.builtin.Type.EnumField{.{
-        .name = @ptrCast(target.name),
-        .value = Enum.fields.len,
-      }};
+      names[t] = availableTargets[t].name;
+      values[t] = t;
     }
-    break:trgt @Type(.{.@"enum" = Enum});
+    break:target @Enum(BackingInt, .exhaustive, &names, &values);
   };
 
   const targets: [availableTargets.len]?*const TargetInfo = 
@@ -128,6 +150,7 @@ pub fn build(b: *std.Build) void {
       .optimize = optimize,
       .link_libc = true,
       //.link_libcpp = true,
+      .single_threaded = false,
     });
 
     //exe_mod.addIncludePath(.{.src_path = .{.owner = b, .sub_path = "src/"}});

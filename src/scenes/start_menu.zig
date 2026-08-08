@@ -12,6 +12,8 @@ const WinCoord = mainspace.WinCoord;
 
 const directoryManager = @import("../directory_manager.zig");
 
+const remote = @import("remote_player.zig");
+
 const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
 
@@ -30,7 +32,7 @@ pub const scene = Scene{
     _ = allocator;
 
     menuFont = sdl.TTF_OpenFont(
-      try directoryManager.getPath(&.{
+      try directoryManager.getPath(mainspace.io, &.{
         "assets", "fonts", "3270NerdFont-Regular.ttf"
       }),
       fontQuality
@@ -41,24 +43,21 @@ pub const scene = Scene{
     };
 
     logoButton = try .initFromTexture(
-      .{0.5, 0.5}, .{0.5, 1.0/6.0}, 0.1, &.{"assets", "images", "logo.png"}
+      mainspace.io,
+      .{0.5, 0.5}, .{0.5, 1.0/7.0}, 0.1, &.{"assets", "images", "logo.png"}
     );
     
     startButton =
-      try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "start");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/7.0}, 0.1, menuFont, "start");
     joinButton =
-      try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/6.0}, 0.1, menuFont, "join");
-    if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, 0.25, 0.25, 0.25))
-    {
-      return error.SDL_RenderFail;
-    }
+      try .initFromText(.{0.5, 0.5}, .{0.5, 3.0/7.0}, 0.1, menuFont, "join");
     guideButton = try .initFromText(
-      .{0.5, 0.5}, .{0.5, 3.0/6.0}, 0.1, menuFont, "how to play"
+      .{0.5, 0.5}, .{0.5, 4.0/7.0}, 0.1, menuFont, "how to play"
     );
     creditsButton =
-      try .initFromText(.{0.5, 0.5}, .{0.5, 4.0/6.0}, 0.1, menuFont, "credits");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 5.0/7.0}, 0.1, menuFont, "credits");
     quitButton =
-      try .initFromText(.{0.5, 0.5}, .{0.5, 5.0/6.0}, 0.1, menuFont, "quit");
+      try .initFromText(.{0.5, 0.5}, .{0.5, 6.0/7.0}, 0.1, menuFont, "quit");
 
     return &scene;
   }}.init,
@@ -81,9 +80,11 @@ pub const scene = Scene{
       {
         Scene.currentScene = Scene.scenes.getPtrConst(.CreateMenu);
         //Scene.currentScene = Scene.scenes.getPtrConst(.Game);
-      } else if (joinButton.contains(.{event.button.x, event.button.y}))
+      } else if (
+        remote.serverFuture != null and
+        joinButton.contains(.{event.button.x, event.button.y}))
       {
-        //Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
+        Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
       } else if (guideButton.contains(.{event.button.x, event.button.y}))
       {
         Scene.currentScene = Scene.scenes.getPtrConst(.Guide);
@@ -115,7 +116,13 @@ pub const scene = Scene{
   {
     try logoButton.render();
     try startButton.render();
-    //try joinButton.render();
+
+    const c: f32 = if (remote.serverFuture == null) 0.25 else 1.0;
+    if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, c, c, c))
+    {
+      return error.SDL_RenderFail;
+    }
+    try joinButton.render();
     try guideButton.render();
     try creditsButton.render();
     try quitButton.render();

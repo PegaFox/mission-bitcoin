@@ -15,13 +15,13 @@ const directoryManager = @import("../directory_manager.zig");
 
 var playerLabel: menu.Button = undefined;
 var playerButton: menu.Button = undefined;
-var selectedPlayer: usize = 0;
+var selectedPlayer: game.PlayerIndex = 0;
 
 var aiLabel: menu.Button = undefined;
 var aiText: menu.Button = undefined;
 var addAi: menu.Button = undefined;
 var subAi: menu.Button = undefined;
-var aiCount: usize = 0;
+var aiCount: game.PlayerIndex = 0;
 
 const fontQuality = 100; // The point size of the loaded font. Higher values increase quality but also increase vram usage
 var menuFont: *sdl.TTF_Font = undefined;
@@ -37,7 +37,7 @@ pub const scene = Scene{
     _ = allocator;
 
     menuFont = sdl.TTF_OpenFont(
-      try directoryManager.getPath(&.{
+      try directoryManager.getPath(mainspace.io, &.{
         "assets", "fonts", "3270NerdFont-Regular.ttf"
       }),
       fontQuality
@@ -50,9 +50,11 @@ pub const scene = Scene{
     playerLabel = try .initFromText(
       .{0.5, 0.5}, .{0.5, 0.075}, 0.05, menuFont, "choose a color"
     );
-    playerButton = try .initFromTexture(.{0.5, 0.5}, .{0.0, 0.2}, 0.15, &.{
-      "assets", "images", "player.svg"
-    });
+    playerButton = try .initFromTexture(mainspace.io,
+      .{0.5, 0.5}, .{0.0, 0.2}, 0.15, &.{
+        "assets", "images", "player.svg"
+      }
+    );
 
     aiLabel = try .initFromText(
       .{0.5, 0.5}, .{0.5, 0.325}, 0.05, menuFont, "AI players"
@@ -90,7 +92,7 @@ pub const scene = Scene{
         {
           log.info("Selected player updated to {}\n", .{p});
 
-          selectedPlayer = p;
+          selectedPlayer = @intCast(p);
         }
       }
 
