@@ -1,6 +1,6 @@
 .{
     .name = .mission_bitcoin,
-    .version = "0.0.0",
+    .version = "0.2.0",
     .minimum_zig_version = "0.16.0",
 
     .dependencies = .{
@@ -28,6 +28,10 @@
         //    .url = "git+https://github.com/emscripten-core/emscripten#5.0.3",
         //    .hash = "N-V-__8AAGx1CgfkO3HYG_ClK2B8D2OfibGY62r0ejRw6G-8",
         //},
+        .android = .{
+            .url = "git+https://github.com/silbinarywolf/zig-android-sdk.git#0e8dfe60ec5120e99d6705ab4606079bc3160a53",
+            .hash = "android-0.3.0-7iz7Qp9IAgBlbdmEnCTne54Rn_lfHtiN3Er6HFkhn5y8",
+        },
     },
     .paths = .{
         "build.zig",

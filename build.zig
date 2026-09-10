@@ -4,6 +4,8 @@ const ResolvedTarget = std.Build.ResolvedTarget;
 const Module = std.Build.Module;
 const LazyPath = std.Build.LazyPath;
 
+const android = @import("android");
+
 const projectZon = @import("build.zig.zon");
 
 const wasm = @import("wasm.zig");
@@ -41,15 +43,16 @@ const availableTargets = [_]TargetInfo{
     .build = buildPc,
     .name = "windows",
   },
-  //.{
-  //  .target = .{
-  //    .cpu_arch = .aarch64,
-  //    .os_tag = .linux,
-  //    .abi = .android,
-  //  },
-  //  .build = buildAndroid,
-  //  .name = "android",
-  //},
+  .{
+    // buildAndroid currently ignores the target field, but too bad you can't stop me
+    .target = .{
+      .cpu_arch = .aarch64,
+      .os_tag = .linux,
+      .abi = .android,
+    },
+    .build = buildAndroid,
+    .name = "android",
+  },
   .{
     .target = .{
       .cpu_arch = .wasm32,
@@ -128,8 +131,8 @@ pub fn build(b: *std.Build) void {
   //});
 
   //const sdlTTF = b.dependency("SDL_ttf", .{
-  //  .optimize = optimize,
   //  .target = target,
+  //  .optimize = optimize,
   //});
   //sdlTTF.artifact("SDL3_ttf").root_module.addIncludePath(emInclude);
     
@@ -149,8 +152,8 @@ pub fn build(b: *std.Build) void {
       .target = b.resolveTargetQuery(target.?.target),
       .optimize = optimize,
       .link_libc = true,
-      //.link_libcpp = true,
-      .single_threaded = false,
+      .link_libcpp = false,
+      //.single_threaded = false,
     });
 
     //exe_mod.addIncludePath(.{.src_path = .{.owner = b, .sub_path = "src/"}});
@@ -202,18 +205,18 @@ pub fn build(b: *std.Build) void {
 fn buildPc(b: *std.Build, mod: *Module) void
 {
   const sdl = b.dependency("sdl", .{
-    .optimize = mod.optimize,
     .target = mod.resolved_target,
+    .optimize = mod.optimize,
   });
     
   const sdlImage = b.dependency("SDL_image", .{
-    .optimize = mod.optimize,
     .target = mod.resolved_target,
+    .optimize = mod.optimize,
   });
     
   const sdlTTF = b.dependency("SDL_ttf", .{
-    .optimize = mod.optimize,
     .target = mod.resolved_target,
+    .optimize = mod.optimize,
   });
 
   mod.addIncludePath(sdl.path("include/SDL3"));
@@ -247,46 +250,86 @@ fn buildPc(b: *std.Build, mod: *Module) void
 
 fn buildAndroid(b: *std.Build, mod: *Module) void
 {
-  const sdl = b.dependency("sdl", .{
-    .optimize = mod.optimize,
-    .target = mod.resolved_target,
-  });
-    
-  const sdlImage = b.dependency("SDL_image", .{
-    .optimize = mod.optimize,
-    .target = mod.resolved_target,
-  });
-    
-  const sdlTTF = b.dependency("SDL_ttf", .{
-    .optimize = mod.optimize,
-    .target = mod.resolved_target,
+  const targets = android.resolveTargets(b, .{
+    // The orelse here should never trigger unless I change something else like an idiot,
+    // but since we set all_targets to true, this field doesn't matter anyway
+    .default_target = mod.resolved_target orelse undefined,
+    .all_targets = false,
+    .api_level = .android15,
   });
 
-  mod.addIncludePath(sdl.path("include/SDL3"));
-  for (sdlImage.artifact("SDL3_image").root_module.include_dirs.items) |dir|
+  const sdk = android.Sdk.create(b, .{});
+  const apk = sdk.createApk(.{
+    .name = "mission_bitcoin",
+    // "37.0.0" will use "$ANDROID_HOME/build-tools/37.0.0" which contains tools like:
+    // "aapt2", "zipalign", "apksigner", "d8"
+    .build_tools_version = "36.1.0",
+    // "27.0.12077973" will is used to access:
+    // - Include headers:  $ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/YOUR_HOST_OS_HERE/sysroot/usr/include
+    // - System libraries: $ANDROID_HOME/ndk/27.0.12077973/toolchains/llvm/prebuilt/YOUR_HOST_OS_HERE/sysroot/usr/lib
+    .ndk_version = "29.0.14206865",
+    // .android15 = 35 (android 15 uses API version 35) decides on:
+    // - System libraries:  $ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/$HOST_OS/sysroot/usr/lib/$TARGET_ARCH/$ANDROID_API_LEVEL
+    // - Platform tool jar: $ANDROID_HOME/platforms/android-ANDROID_API_LEVEL
+    .api_level = .android15,
+  });
+
+  apk.setKeyStore(sdk.createKeyStore(.{
+    .alias = "mission_bitcoin_android",
+    .password = "HumbleStack2140",
+    .algorithm = .rsa,
+    // in bits, the maximum size of an RSA key supported by the Android keystore is 4096 bits (as of 2024)
+    .key_size_in_bits = 4096,
+    .validity_in_days = 365*4 + 1,
+    // https://stackoverflow.com/questions/3284055/what-should-i-use-for-distinguished-name-in-our-keystore-for-the-android-marke/3284135#3284135
+    .distinguished_name = "CN=TBD",
+  }));
+  apk.setAndroidManifest(b.path("android/android_manifest.xml"));
+  apk.addResourceDirectory(b.path("android/resources"));
+  //apk.addAssetDirectory();
+
+  for (targets) |target|
   {
-    if (dir == .path and std.mem.eql(u8, dir.path.basename(b, null), "include"))
-    {
-      mod.addIncludePath(dir.path.path(b, "SDL3_image"));
-    }
+    const archMod = b.createModule(.{
+      .root_source_file = mod.root_source_file,
+      .target = target,
+      .optimize = mod.optimize,
+      .link_libc = mod.link_libc,
+    });
+
+    const sdl = b.dependency("sdl", .{
+      .target = target,
+      .optimize = mod.optimize,
+    });
+      
+    const sdlImage = b.dependency("SDL_image", .{
+      .target = target,
+      .optimize = mod.optimize,
+    });
+    
+    const sdlTTF = b.dependency("SDL_ttf", .{
+      .target = target,
+      .optimize = mod.optimize,
+    });
+
+    archMod.linkLibrary(sdl.artifact("SDL3"));
+    archMod.linkLibrary(sdlImage.artifact("SDL3_image"));
+    archMod.linkLibrary(sdlTTF.artifact("SDL3_ttf"));
+
+    const androidImport = b.dependency("android", .{
+      .target = target,
+      .optimize = mod.optimize,
+    });
+    archMod.addImport("android", androidImport.module("android"));
+
+    const exeLib = b.addLibrary(.{
+      .linkage = .dynamic,
+      .name = "main",
+      .root_module = archMod,
+    });
+    apk.addArtifact(exeLib);
   }
 
-  for (sdlTTF.artifact("SDL3_ttf").root_module.include_dirs.items) |dir|
-  {
-    if (dir == .path and std.mem.eql(u8, dir.path.basename(b, null), "include"))
-    {
-      mod.addIncludePath(dir.path.path(b, "SDL3_ttf"));
-    }
-  }
-
-  mod.linkLibrary(sdl.artifact("SDL3"));
-  mod.linkLibrary(sdlImage.artifact("SDL3_image"));
-  mod.linkLibrary(sdlTTF.artifact("SDL3_ttf"));
-
-  const exe = b.addExecutable(.{
-    .name = @tagName(projectZon.name),
-    .root_module = mod,
-  });
-
-  b.installArtifact(exe);
+  const installed = apk.addInstallApk();
+  b.getInstallStep().dependOn(&installed.step);
 }

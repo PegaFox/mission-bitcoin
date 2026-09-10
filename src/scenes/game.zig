@@ -8,6 +8,7 @@ const mainspace = @import("../main.zig");
 const sdl = mainspace.sdl;
 const WinCoord = mainspace.WinCoord;
 
+const pid = @import("../pid_compression.zig");
 const directoryManager = @import("../directory_manager.zig");
 const menu = @import("../menu.zig");
 
@@ -42,6 +43,10 @@ const fontQuality = 100; // The point size of the loaded font. Higher values inc
 var menuFont: *sdl.TTF_Font = undefined;
 var exchangeLabel: menu.Button = undefined;
 var coldStorageLabel: menu.Button = undefined;
+
+var keyButton: menu.Button = undefined;
+var renderPhrase: bool = false;
+var phraseLabel: menu.Button = undefined;
 
 var spaces = std.ArrayList(Space).empty;
 pub var board = std.ArrayList(Ring).empty;
@@ -101,6 +106,42 @@ pub const scene = Scene{
       .{0.5, 0.5}, .{0.55, 0.98}, 0.02, menuFont, "Cold Storage"
     );
 
+    keyButton = try .initFromTexture(
+      mainspace.io,
+      .{1.0, 1.0},
+      .{0.98, 0.98},
+      0.05,
+      &.{"assets", "images", "key.svg"}
+    );
+
+    std.log.debug("{f}\n", .{remote.localAddress});
+    const compressed = pid.compress(remote.localAddress);
+
+    std.log.debug("{X}\n", .{compressed.buffer[0..compressed.len]});
+    const phrase =
+      try pid.toPhrase(allocator, compressed.buffer[0..compressed.len]);
+    defer allocator.free(phrase);
+    var len: usize = 0;
+    for (phrase) |word|
+    {
+      std.log.debug("{s}\n", .{word});
+      len += word.len+1;
+    }
+
+    const string = try allocator.alloc(u8, len);
+    defer allocator.free(string);
+    var pos: usize = 0;
+    for (phrase) |word|
+    {
+      @memcpy(string[pos..].ptr, word);
+      pos += word.len+1;
+      string[pos-1] = '\n';
+    }
+
+    phraseLabel = try .initFromText(
+      .{1.0, 1.0}, .{0.98, 0.98}, 0.46, menuFont, string
+    );
+
     randomGen =
       .init(@abs(std.Io.Timestamp.now(mainspace.io, .awake).toMicroseconds()));
 
@@ -153,6 +194,21 @@ pub const scene = Scene{
     mPos: @Vector(2, f32),
     mButtons: sdl.SDL_MouseButtonFlags) !bool
   {
+    if (mButtons & sdl.SDL_BUTTON_LEFT > 0)
+    {
+      if (keyButton.contains(mPos))
+      {
+        renderPhrase = true; 
+
+        return true;
+      } else if (renderPhrase)
+      {
+        renderPhrase = false; 
+
+        return true;
+      }
+    }
+
     if (players.items[currentPlayer].controller) |controller|
     {
       _ = try controller.getInput(event, keys, mPos, mButtons);
@@ -265,6 +321,9 @@ pub const scene = Scene{
   {
     board.deinit(gpa);
     spaces.deinit(gpa);
+
+    phraseLabel.deinit();
+    keyButton.deinit();
 
     coldStorageLabel.deinit();
     exchangeLabel.deinit();
@@ -738,7 +797,7 @@ fn renderPlayerWallet(
   {
     const pos = try boardToWindowPos(
       spaceArr,
-      @intCast(players.items.len-playerIndex-1),
+      @intCast(playerIndex),
       Player.endingPos
     );
     const radius =
@@ -780,6 +839,13 @@ fn renderPlayerWallet(
 
   try exchangeLabel.render();
   try coldStorageLabel.render();
+
+  try keyButton.render();
+
+  if (renderPhrase)
+  {
+    try phraseLabel.render();
+  }
 
   if (!noErr)
   {

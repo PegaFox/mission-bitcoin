@@ -6,6 +6,7 @@ const projectZon = @import("build.zig.zon");
 
 pub fn build(b: *std.Build, mod: *Module) void
 {
+  mod.single_threaded = true;
   //const em = b.dependency("emscripten", .{});
   //const emcc = "emcc";
     //em.path("emcc.py").getPath3(b, null);
@@ -44,7 +45,7 @@ pub fn build(b: *std.Build, mod: *Module) void
     emcmake,
     "cmake",
     "--debug-output",
-    "-DCMAKE_C_FLAGS=\"-pthread\"",
+    //"-DCMAKE_C_FLAGS=\"-pthread\"",
     cmakeOptimizeArg,
   });
   sdlBuild.addArg("-S");
@@ -65,7 +66,7 @@ pub fn build(b: *std.Build, mod: *Module) void
     emcmake,
     "cmake",
     "--debug-output",
-    "-DCMAKE_C_FLAGS=\"-pthread\"",
+    //"-DCMAKE_C_FLAGS=\"-pthread\"",
     cmakeOptimizeArg,
   });
   imageBuild.step.dependOn(&sdlMake.step);
@@ -143,9 +144,9 @@ pub fn build(b: *std.Build, mod: *Module) void
     "-g",
     "-v",
     // Explicitely enable concurrency
-    "-pthread",
-    "-sPTHREAD_POOL_SIZE=3",
-    "-sWASM_WORKERS",
+    //"-pthread",
+    //"-sPTHREAD_POOL_SIZE=3",
+    //"-sWASM_WORKERS",
     std.fmt.comptimePrint("-sINITIAL_MEMORY={}", .{1024*64*1024}),
     //"-sUSE_SDL=3",
     //"-sUSE_SDL_IMAGE=3",

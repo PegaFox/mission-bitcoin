@@ -13,6 +13,7 @@ const Player = @import("../player.zig");
 const game = @import("game.zig");
 const remote = @import("remote_player.zig");
 const serialize = @import("../serialize.zig");
+const pid = @import("../pid_compression.zig");
 
 const mainspace = @import("../main.zig");
 const sdl = mainspace.sdl;
@@ -30,6 +31,7 @@ var playerButton: menu.Button = undefined;
 
 var joinCodeButton: menu.Button = undefined;
 var joinCodeInputActive: bool = false;
+var joinCodeInputFlashTime: u16 = 0;
 var joinCodeInput: menu.TextBox = undefined;
 
 var connectButton: menu.Button = undefined;
@@ -75,7 +77,8 @@ pub const scene = Scene{
     joinCodeButton =
       try .initFromText(.{0.5, 0.5}, .{0.5, 0.4}, 0.1, menuFont, "join code");
     joinCodeInput = 
-      try .init(allocator, .{0.5, 0.5}, .{0.5, 0.5}, 0.1, menuFont);
+      try .init(allocator, .{0.0, 0.5}, .{0.2, 0.5}, 0.1, menuFont);
+    joinCodeInput.overflowMode = .{.Scroll = 12};
     connectButton =
       try .initFromText(.{0.5, 0.5}, .{0.5, 0.7}, 0.1, menuFont, "connect");
     backButton =
@@ -253,8 +256,7 @@ pub const scene = Scene{
 
         if (connectButton.contains(.{event.button.x, event.button.y}))
         connFail: {
-          const address =
-            net.IpAddress.parseLiteral(joinCodeInput.text.items) catch |e|
+          const address = parseJoinCode(gpa, joinCodeInput.text.items) catch |e|
           {
             log.err(
               "Failed to parse ip address \"{s}\": {}\n",
@@ -365,16 +367,63 @@ pub const scene = Scene{
       },
       sdl.SDL_EVENT_KEY_DOWN =>
       {
-        if (joinCodeInputActive and event.key.key == sdl.SDLK_BACKSPACE)
+        if (joinCodeInputActive)
         {
-          try joinCodeInput.popString(1);
+          switch (event.key.key)
+          {
+            sdl.SDLK_BACKSPACE =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              try joinCodeInput.removeString(1, true);
+            },
+            sdl.SDLK_DELETE =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              try joinCodeInput.removeString(1, false);
+            },
+            sdl.SDLK_LEFT =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              if (joinCodeInput.writePos > 0)
+              {
+                joinCodeInput.writePos -= 1;
+              }
+            },
+            sdl.SDLK_RIGHT =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              if (joinCodeInput.writePos < joinCodeInput.text.items.len)
+              {
+                joinCodeInput.writePos += 1;
+              }
+            },
+            sdl.SDLK_HOME =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              joinCodeInput.writePos = 0;
+            },
+            sdl.SDLK_END =>
+            {
+              joinCodeInputFlashTime = 0;
+
+              joinCodeInput.writePos = joinCodeInput.text.items.len;
+            },
+            else => {}
+          }
         }
       },
       sdl.SDL_EVENT_TEXT_INPUT =>
       {
+        joinCodeInputFlashTime = 0;
+
         const textSlice = event.text.text[0..std.mem.len(event.text.text)];
 
-        try joinCodeInput.pushString(gpa, textSlice);
+        try joinCodeInput.insertString(gpa, textSlice);
       },
       else => {}
     }
@@ -384,6 +433,17 @@ pub const scene = Scene{
 
   .update = struct {fn update() !void
   {
+    if (joinCodeInputFlashTime < 30)
+    {
+      joinCodeInput.showCursor = true;
+    } else if (joinCodeInputFlashTime < 60)
+    {
+      joinCodeInput.showCursor = false;
+    } else
+    {
+      joinCodeInputFlashTime = 0;
+    }
+    joinCodeInputFlashTime += 1;
 
   }}.update,
   
@@ -413,7 +473,7 @@ pub const scene = Scene{
     }
 
     try joinCodeButton.render();
-    try joinCodeInput.hitbox.render();
+    try joinCodeInput.render();
     try connectButton.render();
     try backButton.render();
   }}.render,
@@ -546,5 +606,34 @@ fn connect(io: Io, address: net.IpAddress) ConnectErrorClass!GreetingData
       serialize.deserialize([game.maxPlayers]net.IpAddress, addresses),
     .remotePlayers = 
       serialize.deserialize([game.maxPlayers]?Player, remotePlayers),
+  };
+}
+
+fn parseJoinCode(allocator: Allocator, joinCode: []const u8) !net.IpAddress
+{
+  return net.IpAddress.parseLiteral(joinCode) catch
+  addr:{
+    //var tokensBuffer
+    var it = std.mem.tokenizeAny(u8, joinCode, " ,:;/\\-_");
+    var len: usize = 0;
+    while (it.next()) |_|
+    {
+      len += 1;
+    }
+
+    it.reset();
+    const phrase = try allocator.alloc([]const u8, len);
+    defer allocator.free(phrase);
+    var index: usize = 0;
+    while (it.next()) |word|
+    {
+      phrase[index] = word;
+
+      index += 1;
+    }
+
+    const compressed = try pid.fromPhrase(phrase);
+
+    break:addr pid.decompress(compressed.buffer[0..compressed.len]);
   };
 }

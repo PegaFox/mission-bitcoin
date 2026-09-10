@@ -15,12 +15,12 @@ pub const ID = enum
   JoinMenu,
   Guide,
   Credits,
+  Remote,
   Game,
   Dice,
   Ending,
   Manual,
   AI,
-  Remote,
 };
 
 pub const scenes = std.EnumArray(ID, Self).init(.{
@@ -29,12 +29,12 @@ pub const scenes = std.EnumArray(ID, Self).init(.{
   .JoinMenu = @import("scenes/join_menu.zig").scene,
   .Guide = @import("scenes/guide.zig").scene,
   .Credits = @import("scenes/credits.zig").scene,
+  .Remote = @import("scenes/remote_player.zig").scene,
   .Game = @import("scenes/game.zig").scene,
   .Dice = @import("scenes/dice.zig").scene,
   .Ending = @import("scenes/ending.zig").scene,
   .Manual = @import("scenes/manual_player.zig").scene,
   .AI = @import("scenes/ai_player.zig").scene,
-  .Remote = @import("scenes/remote_player.zig").scene,
 });
 
 pub var currentScene: *const Self = scenes.getPtrConst(.StartMenu);

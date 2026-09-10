@@ -1,3 +1,5 @@
+const builtin = @import("builtin");
+
 const std = @import("std");
 const log = std.log;
 const Allocator = std.mem.Allocator;
@@ -51,6 +53,14 @@ pub const scene = Scene{
       try .initFromText(.{0.5, 0.5}, .{0.5, 2.0/7.0}, 0.1, menuFont, "start");
     joinButton =
       try .initFromText(.{0.5, 0.5}, .{0.5, 3.0/7.0}, 0.1, menuFont, "join");
+    //if (builtin.os.tag == .emscripten)
+    //{
+    //  if (!joinButton.texture.SetTextureColorModFloat(0.25, 0.25, 0.25))
+    //  {
+    //    log.err("Failed to change texture color: {s}\n", .{sdl.SDL_GetError()});
+    //    return error.SDL_RenderFail;
+    //  }
+    //}
     guideButton = try .initFromText(
       .{0.5, 0.5}, .{0.5, 4.0/7.0}, 0.1, menuFont, "how to play"
     );
@@ -81,7 +91,7 @@ pub const scene = Scene{
         Scene.currentScene = Scene.scenes.getPtrConst(.CreateMenu);
         //Scene.currentScene = Scene.scenes.getPtrConst(.Game);
       } else if (
-        remote.serverFuture != null and
+        //builtin.os.tag != .emscripten and
         joinButton.contains(.{event.button.x, event.button.y}))
       {
         Scene.currentScene = Scene.scenes.getPtrConst(.JoinMenu);
@@ -116,12 +126,6 @@ pub const scene = Scene{
   {
     try logoButton.render();
     try startButton.render();
-
-    const c: f32 = if (remote.serverFuture == null) 0.25 else 1.0;
-    if (!sdl.SDL_SetTextureColorModFloat(joinButton.texture, c, c, c))
-    {
-      return error.SDL_RenderFail;
-    }
     try joinButton.render();
     try guideButton.render();
     try creditsButton.render();

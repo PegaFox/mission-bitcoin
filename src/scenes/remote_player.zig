@@ -1,9 +1,13 @@
+const builtin = @import("builtin");
+
 const std = @import("std");
 const log = std.log;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const net = Io.net;
+const DnsRecord = net.HostName.DnsRecord;
 
+const dns = @import("../dns.zig");
 const serialize = @import("../serialize.zig");
 
 const logger = @import("../log.zig");
@@ -39,7 +43,7 @@ var clientFuture:
   ?Io.Future(@typeInfo(@TypeOf(awaitRemoteMove)).@"fn".return_type.?) = null;
 var clientFutureReady: std.atomic.Value(bool) = .{.raw = false};
 
-var localAddress: net.IpAddress = .{.ip4 = .loopback(0)};
+pub var localAddress: net.IpAddress = .{.ip4 = .loopback(0)};
 var connectionBuffer: [game.maxPlayers-1]net.Stream = undefined;
 pub var connections: std.ArrayList(net.Stream) = .initBuffer(&connectionBuffer);
 /// Associates connection indexes with player indexes. Used to allow multiple players from one connection
@@ -59,21 +63,28 @@ pub const scene = Scene{
       })
     );
 
-    if (getLocalIp(mainspace.io)) |address|
+    if (getSelfIp(mainspace.io)) |address|
     {
       localAddress = address;
 
-      serverFuture =
-        mainspace.io.concurrent(awaitConnections, .{mainspace.io}) catch
-      blk:{
-        log.err(
-          "Concurrency unavailable. Multiplayer games cannot be hosted\n",
-          .{}
-        );
-        break:blk null;
-      };
+      if (builtin.os.tag != .emscripten)
+      {
+        serverFuture =
+          mainspace.io.concurrent(awaitConnections, .{mainspace.io}) catch
+        blk:{
+          log.err(
+            "Concurrency unavailable. Multiplayer games cannot be hosted\n",
+            .{}
+          );
+          break:blk null;
+        };
+      }
     } else |e|
     {
+      if (@errorReturnTrace()) |trace|
+      {
+        std.debug.dumpErrorReturnTrace(trace);
+      }
       log.err(
         "Network unavailable: {}. Multiplayer games cannot be hosted\n",
         .{e}
@@ -186,6 +197,15 @@ pub const scene = Scene{
   }}.deinit,
 };
 
+fn getSelfIp(io: Io) !net.IpAddress
+{
+  return getGlobalIp(io) catch |e|
+  ip:{
+    log.info("Failed to find global IP: {}, defaulting to local IP\n", .{e});
+    break:ip try getLocalIp(io);
+  };
+}
+
 fn getLocalIp(io: Io) !net.IpAddress
 {
   const remoteAddress =
@@ -200,11 +220,174 @@ fn getLocalIp(io: Io) !net.IpAddress
 
   return result;
 }
+  
+fn getGlobalIp(io: Io) !net.IpAddress
+{
+  // I'm storing several addresses but with the blocking IO I don't want to go through the trouble of parsing multiple
+  const RemoteRequest = struct {address: net.IpAddress, request: DnsRecord};
+  const remoteServers = [_]RemoteRequest{
+    RemoteRequest{
+      .address = net.IpAddress{.ip6 = .{
+        .port = 53,
+        .bytes = .{
+          0x26, 0x06, 0x47, 0x00,
+          0x47, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x11, 0x11
+        }
+      }},
+      .request = @enumFromInt(16)
+    },
+    RemoteRequest{
+      .address = net.IpAddress{.ip6 = .{
+        .port = 53,
+        .bytes = .{
+          0x26, 0x06, 0x47, 0x00,
+          0x47, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x10, 0x01
+        }
+      }},
+      .request = @enumFromInt(16)
+    },
+    RemoteRequest{
+      .address = net.IpAddress{.ip6 = .{
+        .port = 53,
+        .bytes = .{
+          0x26, 0x20, 0x01, 0x19,
+          0x00, 0x35, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x35
+        }
+      }},
+      .request = .AAAA
+    },
+    RemoteRequest{
+      .address = net.IpAddress{.ip6 = .{
+        .port = 53,
+        .bytes = .{
+          0x26, 0x20, 0x01, 0x19,
+          0x00, 0x53, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x53
+        }
+      }},
+      .request = .AAAA
+    },
+  };
+
+  const connection = try remoteServers[0].address.connect(
+    io, .{.protocol = .udp, .mode = .dgram}
+  );
+
+  var question = dns.Record.Basic{
+    .name = net.HostName.init("whoami.cloudflare") catch unreachable,
+    .type = @enumFromInt(16), // TXT
+    .class = 3,
+  };
+  const request = dns.Message{
+    .header = .{
+      .transactionID = 1,
+      .recursion = true,
+      .reply = false,
+      .opcode = .Query,
+      .unsafe = false,
+      .questionCount = 1,
+    },
+    .questions = @ptrCast(&question)
+  };
+
+  var connWriter = connection.writer(io, &.{});
+  const writer = &connWriter.interface;
+
+  var requestBuffer: [2048]u8 = undefined;
+  try writer.writeAll(try request.serialize(&requestBuffer));
+  try writer.flush();
+  log.debug("Sending {any}\n", .{try request.serialize(&requestBuffer)});
+
+  var readBuffer: [1024]u8 = undefined;
+  var connReader = connection.reader(io, &readBuffer);
+
+  //for (0..2048) |_|
+  //{
+  //  log.debug("{}\n", .{try connReader.interface.takeByte()});
+  //}
+  var responseBuffer: [16*1024]u8 = undefined;
+  var responseAllocator = std.heap.FixedBufferAllocator.init(&responseBuffer);
+  const response = try dns.Message.deserialize(
+    responseAllocator.allocator(), &connReader.interface
+  );
+
+  std.log.debug("header: {}\n", .{response.header});
+  for (response.questions) |q|
+  {
+    std.log.debug(
+      "question: {{{s}, {}, {}}}\n",
+      .{q.name.bytes, q.type, q.class}
+    );
+  }
+  for (response.answers) |answer|
+  {
+    std.log.debug(
+      "answer: {{{s}, {}, {}, {}, {s}}}\n",
+      .{
+        answer.basic.name.bytes,
+        answer.basic.type,
+        answer.basic.class,
+        answer.lifetime,
+        answer.data
+      }
+    );
+  }
+
+  return .{.ip6 = .{
+    .bytes = switch (net.Ip6Address.Unresolved.parse(response.answers[0].data))
+    {
+      .success => |addr| addr.bytes,
+      .invalid_byte => |pos|
+      {
+        log.err("Failed to parse IP: Invalid char at {}\n", .{pos});
+        return error.InvalidByte;
+      },
+      .incomplete =>
+      {
+        log.err("Failed to parse IP: Incomplete string\n", .{});
+        return error.Incomplete;
+      },
+      .junk_after_end => |pos|
+      {
+        log.err("Failed to parse IP: Junk data at {}\n", .{pos});
+        return error.JunkAfterEnd;
+      },
+      .interface_name_oversized => |pos|
+      {
+        log.err(
+          "Failed to parse IP: Interface name (here: {}) too large\n", .{pos}
+        );
+        return error.InterfaceNameOverflow;
+      },
+      .invalid_ip4_mapping => |pos|
+      {
+        log.err("Failed to parse IP: Invalid ip4 map at {}\n", .{pos});
+        return error.InvalidIp4Mapping;
+      },
+      .overflow => |pos|
+      {
+        log.err("Failed to parse IP: Overflow at {}\n", .{pos});
+        return error.Overflow;
+      },
+    },
+    .port = 0
+  }};
+}
 
 fn awaitConnections(io: Io) (error{Canceled} || net.IpAddress.ListenError)!void
 {
   var server = try localAddress.listen(io, .{.reuse_address = true}); 
   defer server.deinit(io);
+
+  // This records the port in a static location
+  localAddress = server.socket.address;
 
   log.debug("Entering accept loop\n", .{});
 

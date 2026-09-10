@@ -48,17 +48,23 @@ pub fn logFn(
 }
 
 var writeBuffer: [64]u8 = undefined;
+var writer: std.Io.File.Writer = undefined;
 
 pub fn openWriter() std.Io.Cancelable!*std.Io.Writer
 {
   const locked = try mainspace.io.lockStderr(&writeBuffer, .escape_codes);
 
   return &locked.file_writer.interface;
+
+  //writer = std.Io.File.stdout().writer(mainspace.io, &writeBuffer);
+
+  //return &writer.interface;
 }
 
 pub fn closeWriter() void
 {
   mainspace.io.unlockStderr();
+  //writer.flush() catch {};
 }
 
 fn logPrintf(comptime format: []const u8, args: anytype) error{PrintfError}!void

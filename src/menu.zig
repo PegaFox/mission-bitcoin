@@ -44,12 +44,18 @@ pub const Button = struct
       };
     }
 
-    const surface = sdl.TTF_RenderText_Solid(font, label.ptr, label.len, .{
-      .r = 0xFF,
-      .g = 0xFF,
-      .b = 0xFF,
-      .a = 0xFF
-    });
+    const surface = sdl.TTF_RenderText_Solid_Wrapped(
+      font,
+      label.ptr,
+      label.len,
+      .{
+        .r = 0xFF,
+        .g = 0xFF,
+        .b = 0xFF,
+        .a = 0xFF
+      },
+      0
+    );
     defer sdl.SDL_DestroySurface(surface);
 
     return .{
@@ -88,6 +94,18 @@ pub const Button = struct
 
   pub fn contains(self: Self, pos: WinCoord) bool
   {
+    const trueBounds = self.pixelBounds();
+
+    return
+      pos[0] > trueBounds[0][0] and
+      pos[1] > trueBounds[0][1] and
+      pos[0] < trueBounds[0][0]+trueBounds[1][0] and
+      pos[1] < trueBounds[0][1]+trueBounds[1][1];
+  }
+
+  /// Hitbox in unnormalized space
+  pub fn pixelBounds(self: Self) [2]WinCoord
+  {
     const winSize = mainspace.winSize();
 
     const ratio =
@@ -95,20 +113,16 @@ pub const Button = struct
       @as(f32, @floatFromInt(self.texture.h));
     const trueHeight = winSize[1] * self.height;
 
-    const trueCorners = [2]WinCoord{
+    return .{
       .{
         winSize[0]*self.pos[0] - trueHeight*ratio*self.origin[0],
         winSize[1]*self.pos[1] - trueHeight*self.origin[1]
       },
       .{
-        winSize[0]*self.pos[0] + trueHeight*ratio*self.origin[0],
-        winSize[1]*self.pos[1] + trueHeight*self.origin[1]
+        trueHeight*ratio,
+        trueHeight
       },
     };
-
-    return
-      pos[0] > trueCorners[0][0] and pos[1] > trueCorners[0][1] and
-      pos[0] < trueCorners[1][0] and pos[1] < trueCorners[1][1];
   }
 
   pub fn render(self: Self) !void
@@ -152,6 +166,20 @@ pub const TextBox = struct
 
   /// syncTexture should be run after modification
   text: std.ArrayList(u8),
+  /// Optional limits for text length
+  overflowMode: union(enum)
+  {
+    /// Ignore text length
+    None,
+    /// Scroll previous text backwards after the limit, showing only a window
+    Scroll: usize,
+    /// Restrict text size to a specific value
+    Clamp: usize
+  },
+  /// Position of the cursor in the string
+  writePos: usize,
+  showCursor: bool,
+
   font: *sdl.TTF_Font,
   hitbox: Button,
 
@@ -164,6 +192,9 @@ pub const TextBox = struct
   {
     return .{
       .text = try .initCapacity(allocator, 64),
+      .overflowMode = .None,
+      .writePos = 0,
+      .showCursor = true,
       .font = font,
       .hitbox = try .initFromText(origin, pos, height, font, ""),
     };
@@ -175,25 +206,44 @@ pub const TextBox = struct
     self.text.deinit(allocator);
   }
 
-  pub fn pushString(self: *Self, allocator: Allocator, text: []const u8)
-    Error!void
+  /// Moves writePos to the end of inserted text
+  pub fn insertString(
+    self: *Self,
+    allocator: Allocator,
+    text: []const u8) Error!void
   {
-    try self.text.appendSlice(allocator, text);
+    try self.text.insertSlice(allocator, self.writePos, text);
+    self.writePos += text.len;
 
     try self.syncTexture();
   }
 
-  /// Pops popLen characters from self.text and updates the texture
-  /// If popLen > self.text.items.len, empties self.text
-  pub fn popString(self: *Self, popLen: usize)
+  /// Removes len characters from self.text and updates the texture
+  /// If len > self.text.items.len, empties self.text
+  /// Before treats the removal like backspace. Otherwise like delete
+  pub fn removeString(self: *Self, count: usize, before: bool)
     SdlFail!void
   {
-    if (popLen < self.text.items.len)
+    if (before and count > self.writePos)
     {
-      self.text.shrinkRetainingCapacity(self.text.items.len - popLen);
+      self.text.replaceRangeAssumeCapacity(
+        0, self.writePos, &.{}
+      );
+
+      self.writePos = 0;
+    } else if (!before and self.writePos + count > self.text.items.len)
+    {
+      self.text.replaceRangeAssumeCapacity(
+        self.writePos, self.text.items.len - self.writePos, &.{}
+      );
     } else
     {
-      self.text.clearRetainingCapacity();
+      if (before)
+      {
+        self.writePos -= count;
+      }
+
+      self.text.replaceRangeAssumeCapacity(self.writePos, count, &.{});
     }
 
     try self.syncTexture();
@@ -206,11 +256,61 @@ pub const TextBox = struct
 
     self.hitbox.deinit();
 
-    self.hitbox = try .initFromText(
-      hitboxConfig.origin,
-      hitboxConfig.pos,
-      hitboxConfig.height,
-      self.font,
-      self.text.items);
+    if (
+      self.overflowMode == .Scroll and
+      self.text.items.len > self.overflowMode.Scroll)
+    {
+      self.hitbox = try .initFromText(
+        hitboxConfig.origin,
+        hitboxConfig.pos,
+        hitboxConfig.height,
+        self.font,
+        self.text.items[self.text.items.len-self.overflowMode.Scroll..]
+      );
+    } else
+    {
+      self.hitbox = try .initFromText(
+        hitboxConfig.origin,
+        hitboxConfig.pos,
+        hitboxConfig.height,
+        self.font,
+        self.text.items
+      );
+    }
+  }
+
+  pub fn render(self: Self) error{SDL_RenderFail}!void
+  {
+    try self.hitbox.render();
+
+    if (self.showCursor)
+    {
+      const bounds = self.hitbox.pixelBounds();
+
+      const chWidth =
+        if (self.text.items.len > 0)
+          bounds[1][0] / @as(f32, @floatFromInt(self.text.items.len))
+        else
+          0;
+
+      const xPos =
+        self.hitbox.pos[0] +
+        (chWidth * @as(f32, @floatFromInt(self.writePos))) /
+        mainspace.winSize()[0];
+
+      if (!mainspace.renderer.SetRenderDrawColorFloat(1.0, 1.0, 1.0, 1.0))
+      {
+        return error.SDL_RenderFail;
+      }
+      if (!mainspace.renderer.RenderFillRect(&.{
+        .x = xPos*mainspace.winSize()[0],
+        .y = bounds[0][1],
+        .w = 0.005*mainspace.winSize()[0],
+        .h = self.hitbox.height*mainspace.winSize()[1],
+      }))
+      {
+        return error.SDL_RenderFail;
+      }
+    }
   }
 };
